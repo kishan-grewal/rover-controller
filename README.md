@@ -1,9 +1,13 @@
-# rover_controller
+# Libraries Required:
+
+SharpDistSensor
+
+## Information
 
 This is our Term 3 group Arduino project for university.  
 All code is written in C++ and based on the Arduino platform.
 
-## 👥 Team Members
+## Team Members
 
 - Andrew
 - Omar

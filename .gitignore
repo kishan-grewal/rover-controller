@@ -1,0 +1,12 @@
+# Arduino build and cache
+*.elf
+*.hex
+*.bin
+*.eep
+*.d
+*.o
+*.a
+.build/
+.vscode/
+.DS_Store
+Thumbs.db

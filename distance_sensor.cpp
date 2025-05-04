@@ -1,16 +1,14 @@
-#include <Arduino.h>
-#include <SharpDistSensor.h>
 #include "distance_sensor.h"
+#include <SharpDistSensor.h>
 
-const byte sensorPin = A0;
+const byte sensorPin = A0;                    // Update if needed
 const byte medianFilterWindowSize = 5;
+SharpDistSensor sharp(sensorPin, medianFilterWindowSize);
 
-SharpDistSensor sensor(sensorPin, medianFilterWindowSize);
-
-void initDistanceSensor() {
-  sensor.setModel(SharpDistSensor::GP2Y0A51SK0F_5V_DS);
+void DistanceSensor::begin() {
+  sharp.setModel(SharpDistSensor::GP2Y0A51SK0F_5V_DS);  // Match your actual sensor model
 }
 
-unsigned int readDistance() {
-  return sensor.getDist();
+float DistanceSensor::readDistance() {
+  return sharp.getDist();  // Returns distance in mm
 }

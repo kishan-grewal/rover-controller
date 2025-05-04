@@ -1,46 +1,38 @@
 #include <Arduino.h>
 #include "line_sensor.h"
-#include "distance_sensor.h"
-#include "wifi_logic.h"
 #include "motor_driver.h"
+#include "wifi_logic.h"
+// #include "distance_sensor.h" // optional IR
 
-// uint16_t sensorValues[9];
+// one motor (IN1, IN2, ENA)
+MotorDriver motor(22, 23, 6);
 
-// Pin mapping for GIGA R1
+// DistanceSensor distSensor; // if using Sharp IR
 
-// MotorDriver motor1(22, 23, 6);  // IN1, IN2, ENA
-
-// PWM -255 to 255
+const int BASE_SPEED = 100; // change if needed
 
 void setup() {
   Serial.begin(115200);
   while (!Serial);
 
-  setupLineSensor();       
-  //initDistanceSensor();    
-  setupWiFi();           
-  // motor1.begin(); 
+  setupLineSensor(); // qtr init + calibrate
+  motor.begin();     // pins out
+  setupWiFi();       // udp
+  // distSensor.begin(); // if using IR
 }
 
 void loop() {
-  loopLineSensor(); 
-  //unsigned int distance = readDistance();                
+  uint16_t values[9];
+  int position = qtr.readLine(values); // 0–8000
+  Serial.print("line: ");
+  Serial.println(position);
 
-  //Serial.print("Line: ");
-  //Serial.print(linePosition);
-  //Serial.print(" | Distance: ");
-  //Serial.println(distance);
+  motor.setSpeed(BASE_SPEED); // constant forward
 
-  handleWiFi();  
+  // float d = distSensor.readDistance(); // mm
+  // Serial.print("dist: ");
+  // Serial.println(d);
 
-  // delay(1000);
-  // motor1.setSpeed(-150); // reverse
-  // delay(1000);
-  // motor1.setSpeed(0); // stop
-  // delay(1000);
-  // motor1.setSpeed(150); // stop
+  handleWiFi(); // udp
+  delay(20);
 }
-
-// comment to show I pushed from pc and pulled on laptop
-
-

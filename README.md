@@ -1,6 +1,8 @@
 # Libraries Required:
 
 SharpDistSensor
+Average
+Math
 
 ## Information
 

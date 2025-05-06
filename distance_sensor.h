@@ -3,8 +3,11 @@
 
 class DistanceSensor {
 public:
-  void begin();           // Initialise Sharp sensor
-  float readDistance();   // Returns distance in mm
+  // Initialise the Sharp IR distance sensor
+  void begin();
+
+  // Returns filtered distance in millimetres (uses SharpDistSensor library)
+  float readDistance();
 };
 
 #endif

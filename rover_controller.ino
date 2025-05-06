@@ -2,12 +2,14 @@
 #include "line_sensor.h"
 #include "motor_driver.h"
 #include "wifi_logic.h"
-// #include "distance_sensor.h" // optional IR
+#include "distance_sensor.h"
+#include <Average.h>
+#include <math.h>
 
 // one motor (IN1, IN2, ENA)
-MotorDriver motor(22, 23, 6);
+MotorDriver motor(22, 23, 12);
 
-// DistanceSensor distSensor; // if using Sharp IR
+Average<float> ave(10);
 
 const int BASE_SPEED = 100; // change if needed
 
@@ -15,24 +17,24 @@ void setup() {
   Serial.begin(115200);
   while (!Serial);
 
-  setupLineSensor(); // qtr init + calibrate
+  setupLineSensor(); // QTR init + calibrate
   motor.begin();     // pins out
-  setupWiFi();       // udp
-  // distSensor.begin(); // if using IR
+  setupWiFi();       // UDP
 }
 
 void loop() {
   uint16_t values[9];
   int position = qtr.readLine(values); // 0–8000
-  Serial.print("line: ");
-  Serial.println(position);
+
+  // Debugging line sensor:
+  // Serial.print("line: ");
+  // Serial.println(position);
 
   motor.setSpeed(BASE_SPEED); // constant forward
 
-  // float d = distSensor.readDistance(); // mm
-  // Serial.print("dist: ");
-  // Serial.println(d);
+  ave.push(4600.5 * pow(map(analogRead(A0), 0, 1023, 0, 5000), -0.94));
+  Serial.println(ave.mean());
 
-  handleWiFi(); // udp
-  delay(20);
+  handleWiFi(); // UDP logic
+  delay(200);
 }

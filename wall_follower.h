@@ -17,7 +17,7 @@ private:
   MotorDriver& _leftMotor;
   MotorDriver& _rightMotor;
   PIDController _pid;
-  const int _baseSpeed = 100;
+  int _baseSpeed = 100;
 };
 
 #endif // WALL_FOLLOWER_H

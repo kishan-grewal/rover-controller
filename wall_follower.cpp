@@ -4,9 +4,9 @@ WallFollower::WallFollower(DistanceSensor& sensor, MotorDriver& leftMotor, Motor
                            float kp, float ki, float kd)
   : _sensor(sensor), _leftMotor(leftMotor), _rightMotor(rightMotor), _pid(kp, ki, kd) {}
 
-void WallFollower::followWall(float targetDistanceMm) {
-  float currentDistance = _sensor.readDistance();  // in mm
-  float error = targetDistanceMm - currentDistance;
+void WallFollower::followWall(float targetDistanceCm) {
+  float currentDistance = _sensor.getMean();
+  float error = targetDistanceCm - currentDistance;
   float correction = _pid.compute(error);
 
   // Limit correction to prevent wild turns

@@ -5,11 +5,13 @@
 #include "distance_sensor.h"
 #include <Average.h>
 #include <math.h>
+#include <WiFi.h>
+#include <WiFiUdp.h>
 
 // one motor (IN1, IN2, ENA)
-MotorDriver motor(22, 23, 12);
+//MotorDriver motor(22, 23, 12);
 
-Average<float> ave(10);
+DistanceSensor sensor(A0);
 
 const int BASE_SPEED = 100; // change if needed
 
@@ -18,7 +20,7 @@ void setup() {
   while (!Serial);
 
   setupLineSensor(); // QTR init + calibrate
-  motor.begin();     // pins out
+  //motor.begin();     // pins out
   setupWiFi();       // UDP
 }
 
@@ -27,13 +29,13 @@ void loop() {
   int position = qtr.readLine(values); // 0–8000
 
   // Debugging line sensor:
-  // Serial.print("line: ");
-  // Serial.println(position);
+  Serial.print("line: ");
+  Serial.println(position);
 
-  motor.setSpeed(BASE_SPEED); // constant forward
+  //motor.setSpeed(BASE_SPEED); // constant forward
 
-  ave.push(4600.5 * pow(map(analogRead(A0), 0, 1023, 0, 5000), -0.94));
-  Serial.println(ave.mean());
+  Serial.print("distance: ");
+  Serial.println(sensor.getMean());
 
   handleWiFi(); // UDP logic
   delay(200);

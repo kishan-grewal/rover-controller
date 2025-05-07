@@ -5,13 +5,13 @@
 
 class MotorDriver {
   public:
-    MotorDriver(int in1Pin, int enaPin);
+    MotorDriver(int dirPin, int pwmPin);
     void begin();
     void setSpeed(int speed);
 
   private:
-    int in1;
-    int ena;
+    int dir;
+    int pwm;
 };
 
 #endif

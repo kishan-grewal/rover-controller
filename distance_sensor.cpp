@@ -5,10 +5,17 @@ DistanceSensor::DistanceSensor(uint8_t pin, float alpha, size_t bufferSize)
   : analogPin(pin), alpha(alpha), filtered(0), ave(bufferSize) {}
 
 void DistanceSensor::update() {
-    float voltage_mV = readSmoothedVoltage();
-    float distance = calculateDistance(voltage_mV);
-    filtered = alpha * distance + (1 - alpha) * filtered;
-    ave.push(filtered);
+    static unsigned long lastCheckTime = 0;
+    const unsigned long interval = 200; // 200 ms
+
+    unsigned long currentTime = millis();
+
+    if (currentTime - lastCheckTime >= interval) {
+        float voltage_mV = readSmoothedVoltage();
+        float distance = calculateDistance(voltage_mV);
+        filtered = alpha * distance + (1 - alpha) * filtered;
+        ave.push(filtered);
+    }
 }
 
 float DistanceSensor::getMean() {

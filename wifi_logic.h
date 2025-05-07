@@ -2,6 +2,6 @@
 #define WIFI_LOGIC_H
 
 void setupWiFi();
-void handleWiFi();
+bool handleWiFi();
 
 #endif

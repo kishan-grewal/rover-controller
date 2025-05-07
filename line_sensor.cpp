@@ -22,16 +22,21 @@ void setupLineSensor() {
 }
 
 void loopLineSensor() {
-  uint16_t raw[NUM_SENSORS];
-  uint16_t pos = qtr.readLine(raw);
+  static unsigned long lastCheckTime = 0;
+  const unsigned long interval = 200; // 200 ms
 
-  Serial.print("Raw: ");
-  for (uint8_t i = 0; i < NUM_SENSORS; i++) {
-    Serial.print(raw[i]);
-    Serial.print(i < NUM_SENSORS - 1 ? '\t' : '\n');
+  unsigned long currentTime = millis();
+
+  if (currentTime - lastCheckTime >= interval) {
+    uint16_t raw[NUM_SENSORS];
+    uint16_t pos = qtr.readLine(raw);
+
+    Serial.print("Raw: ");
+    for (uint8_t i = 0; i < NUM_SENSORS; i++) {
+      Serial.print(raw[i]);
+      Serial.print(i < NUM_SENSORS - 1 ? '\t' : '\n');
+    }
+    Serial.print("Pos: ");
+    Serial.println(pos);
   }
-  Serial.print("Pos: ");
-  Serial.println(pos);
-
-  delay(200);
 }

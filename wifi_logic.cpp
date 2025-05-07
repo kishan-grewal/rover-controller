@@ -49,25 +49,33 @@ void setupWiFi() {
   }
 }
 
-void handleWiFi() {
-  // --- Receiving Data ---
-  int packetSize = Udp.parsePacket();
+bool handleWiFi() {
+  static unsigned long lastCheckTime = 0;
+  const unsigned long interval = 200; // 200 ms
 
-  if (packetSize) {
-    int len = Udp.read(incomingPacket, sizeof(incomingPacket) - 1);
-    if (len > 0) incomingPacket[len] = '\0';
+  unsigned long currentTime = millis();
 
-    Serial.print("Received message: ");
-    Serial.println(incomingPacket);
+  if (currentTime - lastCheckTime >= interval) {
+    lastCheckTime = currentTime;
 
-    char msg[50] = "";
-    if (sscanf(incomingPacket, "msg=%s", msg) == 1) {
-      Serial.print("Parsed message: ");
-      Serial.println(msg);
-    } else {
-      Serial.println("Failed to parse message.");
+    // --- Receiving Data ---
+    int packetSize = Udp.parsePacket();
+
+    if (packetSize) {
+      int len = Udp.read(incomingPacket, sizeof(incomingPacket) - 1);
+      if (len > 0) incomingPacket[len] = '\0';
+
+      Serial.print("Received message: ");
+      Serial.println(incomingPacket);
+
+      if (strstr(incomingPacket, "msg=stop") != nullptr) {
+        Serial.println("Parsed: msg=stop");
+        return true;
+      }
+      else {
+        Serial.println("Failed to parse message.");
+      }
     }
   }
-
-  delay(200);
+  return false;
 }

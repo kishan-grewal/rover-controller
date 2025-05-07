@@ -4,13 +4,14 @@
 #include <Arduino.h>
 
 class MotorDriver {
-  private:
-    int in1, in2, ena;
-
   public:
-    MotorDriver(int in1Pin, int in2Pin, int enaPin);
+    MotorDriver(int in1Pin, int enaPin);
     void begin();
     void setSpeed(int speed);
+
+  private:
+    int in1;
+    int ena;
 };
 
 #endif

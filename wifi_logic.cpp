@@ -28,7 +28,7 @@ void setupWiFi() {
   WiFi.begin(ssid, password);
 
   unsigned long startAttemptTime = millis();
-  const unsigned long timeout = 15000; // 15 seconds max
+  const unsigned long timeout = 5000; // 15 seconds max
 
   while (WiFi.status() != WL_CONNECTED && millis() - startAttemptTime < timeout) {
     Serial.print(".");

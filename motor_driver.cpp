@@ -11,16 +11,24 @@ void MotorDriver::begin() {
 }
 
 void MotorDriver::setSpeed(int speed) {
-    if (speed > 0) {
-        digitalWrite(dir, HIGH);
-        analogWrite(pwm, speed);
-    }
-    else if (speed < 0) {
-        digitalWrite(dir, LOW);
-        analogWrite(pwm, -speed);
-    }
-    else {
-        digitalWrite(dir, LOW);
-        analogWrite(pwm, 0);
+    static unsigned long lastCheckTime = 0;
+    const unsigned long interval = 200; // 200 ms
+
+    unsigned long currentTime = millis();
+
+    if (currentTime - lastCheckTime >= interval) {
+        lastCheckTime = currentTime;
+        if (speed > 0) {
+            digitalWrite(dir, HIGH);
+            analogWrite(pwm, speed);
+        }
+        else if (speed < 0) {
+            digitalWrite(dir, LOW);
+            analogWrite(pwm, -speed);
+        }
+        else {
+            digitalWrite(dir, LOW);
+            analogWrite(pwm, 0);
+        }
     }
 }

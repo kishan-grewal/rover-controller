@@ -8,7 +8,7 @@
 #include <WiFi.h>
 #include <WiFiUdp.h>
 
-#define BUTTON_PIN 4
+#define BUTTON_PIN 8
 #define DEBOUNCE_TIME 25
 
 int last_steady_state = LOW;       // the previous steady state from the input pin
@@ -18,12 +18,11 @@ bool robot_enabled = true;
 
 unsigned long last_debounce_time = 0;  // the last time the output pin was toggled
 
-// one motor (IN1, IN2, ENA)
-//MotorDriver motor(22, 23, 12);
+MotorDriver motor(4, 5);
 
 DistanceSensor sensor(A0);
 
-const int BASE_SPEED = 100; // change if needed
+const int BASE_SPEED = 150; // change if needed
 
 void setup() {
   Serial.begin(115200);
@@ -32,7 +31,7 @@ void setup() {
   setupWiFi();       // UDP
   pinMode(BUTTON_PIN, INPUT_PULLUP);
   //setupLineSensor(); // QTR init + calibrate
-  //motor.begin();     // pins out
+  motor.begin();     // pins out
 }
 
 void loop() {
@@ -44,11 +43,9 @@ void loop() {
     //Serial.print("line: ");
     //Serial.println(position);
 
-    //motor.setSpeed(BASE_SPEED); // constant forward
-
     sensor.update();
-    Serial.print("distance: ");
     Serial.println(sensor.getMean());
+    motor.setSpeed(BASE_SPEED);
   }
 
   bool stop = handleWiFi(); // UDP logic

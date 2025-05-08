@@ -1,81 +1,91 @@
 #include <SPI.h>
-#include <WiFi.h>
+#include <WiFi.h>       // GIGA R1 Wi-Fi lib
 #include <WiFiUdp.h>
-#include "wifi_logic.h"
 
-// WiFi credentials
-const char ssid[] = "test";
+// Wi-Fi credentials
+const char ssid[]     = "test";
 const char password[] = "password";
 
-// Assign unique IPs manually (match with your network settings)
-const IPAddress deviceIP(192, 168, 155, 43); // Change this for the second Arduino
-// const IPAddress peerIP(192, 168, 243, 22); // The other Arduino's IP
+// Static IP settings (match your hotspot’s network)
+const IPAddress deviceIP(192, 168, 155, 43);
+const IPAddress gateway( 192, 168, 155, 1);
+const IPAddress subnet(  255, 255, 255, 0);
 
-// const unsigned int sendPort = 2000;       // Port to send data
-const unsigned int listenPort = 3000;         // Port to listen for incoming data
+const unsigned int listenPort = 3000;
 
 WiFiUDP Udp;
-char incomingPacket[50]; // Buffer for received data
+char incomingPacket[50];
 
 void setupWiFi() {
   Serial.print("Connecting to ");
   Serial.println(ssid);
 
-  delay(2000); // Give time for serial and WiFi chip to initialise
-  WiFi.disconnect(); // Reset the WiFi module
-  delay(1000);
+  // 1) tear down any old connection
+  WiFi.disconnect();
+  delay(500);
 
+  // 2) configure static IP (no return value to check)
+  WiFi.config(deviceIP, gateway, subnet);
+
+  // 3) begin joining
   WiFi.begin(ssid, password);
 
-  unsigned long startAttemptTime = millis();
-  const unsigned long timeout = 5000; // 15 seconds max
-
-  while (WiFi.status() != WL_CONNECTED && millis() - startAttemptTime < timeout) {
-    Serial.print(".");
+  unsigned long start = millis();
+  const unsigned long timeout = 1000; // 10 s
+  while (WiFi.status() != WL_CONNECTED && millis() - start < timeout) {
+    Serial.print('.');
     delay(500);
   }
 
   if (WiFi.status() == WL_CONNECTED) {
-    Serial.println("\nConnected to WiFi");
-    Serial.print("My IP is: ");
-    Serial.println(WiFi.localIP());
+    Serial.println();
+    Serial.println("Connected to Wi-Fi");
+    Serial.print("  IP:      "); Serial.println(WiFi.localIP());
+    Serial.print("  Gateway: "); Serial.println(WiFi.gatewayIP());
+    Serial.print("  Subnet:  "); Serial.println(WiFi.subnetMask());
 
-    // Start UDP
+    // 4) restart UDP on a clean socket
+    Udp.stop();
     Udp.begin(listenPort);
-    Serial.print("Listening on port ");
+    Serial.print("Listening on UDP port ");
     Serial.println(listenPort);
-  } else {
-    Serial.println("\nFailed to connect to WiFi.");
+  }
+  else {
+    Serial.println();
+    Serial.println("Failed to connect to Wi-Fi");
   }
 }
 
 bool handleWiFi() {
-  static unsigned long lastCheckTime = 0;
-  const unsigned long interval = 200; // 200 ms
+  static unsigned long lastCheck = 0;
+  const unsigned long interval = 200;
+  unsigned long now = millis();
+  if (now - lastCheck < interval) return false;
+  lastCheck = now;
 
-  unsigned long currentTime = millis();
+  // if we ever drop out, reconnect
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("Wi-Fi lost, reconnecting...");
+    setupWiFi();
+    return false;
+  }
 
-  if (currentTime - lastCheckTime >= interval) {
-    lastCheckTime = currentTime;
+  // check for incoming UDP packets
+  int packetSize = Udp.parsePacket();
+  if (packetSize) {
+    int len = Udp.read(incomingPacket, sizeof(incomingPacket) - 1);
+    if (len > 0) incomingPacket[len] = '\0';
 
-    // --- Receiving Data ---
-    int packetSize = Udp.parsePacket();
-
-    if (packetSize) {
-      int len = Udp.read(incomingPacket, sizeof(incomingPacket) - 1);
-      if (len > 0) incomingPacket[len] = '\0';
-
-      Serial.print("Received message: ");
-      Serial.println(incomingPacket);
-
-      if (strstr(incomingPacket, "msg=stop") != nullptr) {
-        Serial.println("Parsed: msg=stop");
-        return true;
-      }
-      else {
-        Serial.println("Failed to parse message.");
-      }
+    Serial.print("Received: ");
+    Serial.println(incomingPacket);
+    if (strstr(incomingPacket, "msg=stop")) {
+      Serial.println("Parsed: msg=stop");
+      return true;
+    }
+    else {
+      Serial.println("Could not parse message");
     }
   }
+
   return false;
 }

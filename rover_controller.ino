@@ -7,8 +7,9 @@
 #include <math.h>
 #include <WiFi.h>
 #include <WiFiUdp.h>
+#include <Motoron.h>
 
-#define BUTTON_PIN 8
+#define BUTTON_PIN 50
 #define DEBOUNCE_TIME 25
 
 int last_steady_state = LOW;       // the previous steady state from the input pin
@@ -18,7 +19,8 @@ bool robot_enabled = true;
 
 unsigned long last_debounce_time = 0;  // the last time the output pin was toggled
 
-MotorDriver motor(4, 5);
+//MotorDriver motor(4, 5);
+//MotorDriver motor2(7, 6);
 
 DistanceSensor sensor(A0);
 
@@ -28,10 +30,21 @@ void setup() {
   Serial.begin(115200);
   while (!Serial);
 
-  setupWiFi();       // UDP
+  setupWiFi();
+
   pinMode(BUTTON_PIN, INPUT_PULLUP);
-  //setupLineSensor(); // QTR init + calibrate
-  motor.begin();     // pins out
+
+  // give the line a moment to settle
+  delay(50);
+
+  // read the real button state once, and use that
+  int initState = digitalRead(BUTTON_PIN);
+  last_steady_state      = initState;
+  last_flickerable_state = initState;
+  last_debounce_time     = millis();
+
+  //motor.begin();
+  //motor2.begin();
 }
 
 void loop() {
@@ -45,7 +58,8 @@ void loop() {
 
     sensor.update();
     Serial.println(sensor.getMean());
-    motor.setSpeed(BASE_SPEED);
+    //motor.setSpeed(BASE_SPEED);
+    //motor2.setSpeed(BASE_SPEED);
   }
 
   bool stop = handleWiFi(); // UDP logic

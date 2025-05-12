@@ -19,6 +19,11 @@ public:
   void read(uint16_t* values);
   uint16_t readLine(uint16_t* values);
 
+  float getLineConvexity(const uint16_t* rawValues,
+                       uint16_t minValue = 600,
+                       float centreWeight = 2.0,
+                       float neighbourWeight = 1.0);
+
 private:
   const uint8_t* _pins;
   uint8_t _count;

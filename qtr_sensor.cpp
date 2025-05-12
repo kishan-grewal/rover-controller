@@ -99,3 +99,26 @@ uint16_t QTRSensor::readLine(uint16_t* values) {
   return _lastPosition;
 }
 
+float QTRSensor::getLineConvexity(const uint16_t* rawValues,
+                                  uint16_t minValue,
+                                  float centreWeight,
+                                  float neighbourWeight) {
+  if (_count < 3) return 0.0;  // Need at least 3 sensors
+
+  uint16_t* v = new uint16_t[_count];
+  for (uint8_t i = 0; i < _count; i++) {
+    v[i] = constrain(rawValues[i], _min[i], _max[i]);
+    v[i] = map(v[i], _min[i], _max[i], 0, 1000);
+  }
+
+  float maxCurvature = 0.0;
+  for (uint8_t i = 1; i < _count - 1; i++) {
+    if (v[i] < minValue) continue;  // Skip weak middle readings
+
+    float curv = centreWeight * v[i] - neighbourWeight * (v[i - 1] + v[i + 1]);
+    if (curv > maxCurvature) maxCurvature = curv;
+  }
+
+  delete[] v;
+  return maxCurvature / 1000.0;  // Normalise to [0.0, 1.0]
+}

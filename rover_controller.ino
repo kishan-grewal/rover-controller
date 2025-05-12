@@ -19,9 +19,6 @@ bool robot_enabled = true;
 
 unsigned long last_debounce_time = 0;  // the last time the output pin was toggled
 
-//MotorDriver motor(4, 5);
-//MotorDriver motor2(7, 6);
-
 DistanceSensor sensor(A0);
 
 const int BASE_SPEED = 150; // change if needed
@@ -39,12 +36,9 @@ void setup() {
 
   // read the real button state once, and use that
   int initState = digitalRead(BUTTON_PIN);
-  last_steady_state      = initState;
+  last_steady_state = initState;
   last_flickerable_state = initState;
-  last_debounce_time     = millis();
-
-  //motor.begin();
-  //motor2.begin();
+  last_debounce_time = millis();
 }
 
 void loop() {
@@ -58,8 +52,9 @@ void loop() {
 
     sensor.update();
     Serial.println(sensor.getMean());
-    //motor.setSpeed(BASE_SPEED);
-    //motor2.setSpeed(BASE_SPEED);
+
+    //float convexity = qtr.getLineConvexity(sensorValues);
+    //Serial.println(convexity);
   }
 
   bool stop = handleWiFi(); // UDP logic

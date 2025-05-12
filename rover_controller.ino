@@ -1,6 +1,6 @@
 #include <Arduino.h>
 #include "line_sensor.h"
-#include "motor_driver.h"
+#include "motor_shield.h"
 #include "wifi_logic.h"
 #include "distance_sensor.h"
 #include <Average.h>
@@ -20,6 +20,7 @@ bool robot_enabled = true;
 unsigned long last_debounce_time = 0;  // the last time the output pin was toggled
 
 DistanceSensor sensor(A0);
+MotorShield motor_shield(0x10);
 
 const int BASE_SPEED = 150; // change if needed
 
@@ -30,6 +31,7 @@ void setup() {
   setupWiFi();
 
   pinMode(BUTTON_PIN, INPUT_PULLUP);
+  motor_shield.begin();
 
   // give the line a moment to settle
   delay(50);

@@ -1,7 +1,7 @@
 #include <Arduino.h>
-#include "line_sensor.h"
 #include "wifi_logic.h"
 #include "distance_sensor.h"
+#include "QTRSensorArray.h"
 #include <Average.h>
 #include <math.h>
 #include <WiFi.h>
@@ -25,6 +25,10 @@ unsigned long last_debounce_time = 0;  // the last time the output pin was toggl
 
 DistanceSensor sensor(A0);
 
+const uint8_t SENSOR_PINS[9] = {24, 25, 26, 27, 28, 29, 30, 31, 32};
+const uint8_t LED_PIN = 22;
+QTRSensorArray qtr(SENSOR_PINS, LED_PIN);
+
 const int BASE_SPEED = 150; // change if needed
 
 void setup() {
@@ -47,6 +51,17 @@ void setup() {
   // give the line a moment to settle
   delay(50);
 
+  Serial.println("start calibration");
+  qtr.begin();
+  delay(700);
+
+  qtr.calibrate();
+  qtr.printCalibration();
+
+  delay(12000);
+  Serial.println("\nr0,r1,r2,r3,r4,r5,r6,r7,r8,pos");
+  delay(5000);
+
   // read the real button state once, and use that
   int initState = digitalRead(BUTTON_PIN);
   last_steady_state = initState;
@@ -56,30 +71,38 @@ void setup() {
 
 void loop() {
   if (robot_enabled == true) {
-    uint16_t values[9];
-    //int position = qtr.readLine(values); // 0–8000
+    static unsigned long lastCheck = 0;
+    const unsigned long interval = 200;
+    unsigned long now = millis();
 
-    // Debugging line sensor:
-    //Serial.print("line: ");
-    //Serial.println(position);
+    static uint16_t pos = 4000; // keep previous position if not updated
+    static uint16_t raw[9];
 
-    sensor.update();
-    Serial.println(sensor.getMean());
+    if (now - lastCheck > interval) {
+        lastCheck = now;
+        sensor.update();
+        Serial.println(sensor.getMean());
 
-    //float convexity = qtr.getLineConvexity(sensorValues);
-    //Serial.println(convexity);
+        pos = qtr.readLineBlack(raw);
 
-    if (millis() & 2048)
-    {
-      mc.setSpeed(1, 800);
-      mc.setSpeed(2, 800);
+        for (uint8_t i = 0; i < 9; i++) {
+            Serial.print(raw[i]);
+            Serial.write(',');
+        }
+
+        Serial.print("Pos: ");
+        Serial.println(pos);
     }
-    else
-    {
-      mc.setSpeed(1, -800);
-      mc.setSpeed(2, 800);
+
+    if (millis() & 2048) {
+        mc.setSpeed(1, 200);
+        mc.setSpeed(2, 400);
+    } else {
+        mc.setSpeed(1, -400);
+        mc.setSpeed(2, 200);
     }
   }
+
 
   bool stop = handleWiFi(); // UDP logic
   if (stop == true) {

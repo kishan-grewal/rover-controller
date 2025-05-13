@@ -31,7 +31,7 @@ void setupWiFi() {
   WiFi.begin(ssid, password);
 
   unsigned long start = millis();
-  const unsigned long timeout = 1000; // 10 s
+  const unsigned long timeout = 1000; // 1 second is too short
   while (WiFi.status() != WL_CONNECTED && millis() - start < timeout) {
     Serial.print('.');
     delay(500);

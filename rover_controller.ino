@@ -71,6 +71,8 @@ void setup() {
 
 void loop() {
   if (robot_enabled == true) {
+    sensor.update();
+
     static unsigned long lastCheck = 0;
     const unsigned long interval = 200;
     unsigned long now = millis();
@@ -80,7 +82,7 @@ void loop() {
 
     if (now - lastCheck > interval) {
         lastCheck = now;
-        sensor.update();
+        
         Serial.println(sensor.getMean());
 
         pos = qtr.readLineBlack(raw);

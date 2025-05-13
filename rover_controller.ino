@@ -1,13 +1,17 @@
 #include <Arduino.h>
 #include "line_sensor.h"
-#include "motor_shield.h"
 #include "wifi_logic.h"
 #include "distance_sensor.h"
 #include <Average.h>
 #include <math.h>
 #include <WiFi.h>
 #include <WiFiUdp.h>
+
+#include <Wire.h>
+#define Wire Wire1  // Tell all libraries to use the secondary I2C bus
 #include <Motoron.h>
+
+MotoronI2C mc(0x10);
 
 #define BUTTON_PIN 50
 #define DEBOUNCE_TIME 25
@@ -20,7 +24,6 @@ bool robot_enabled = true;
 unsigned long last_debounce_time = 0;  // the last time the output pin was toggled
 
 DistanceSensor sensor(A0);
-MotorShield motor_shield(0x10);
 
 const int BASE_SPEED = 150; // change if needed
 
@@ -31,7 +34,15 @@ void setup() {
   setupWiFi();
 
   pinMode(BUTTON_PIN, INPUT_PULLUP);
-  motor_shield.begin();
+  
+  Wire.begin();
+  mc.reinitialize();    // Bytes: 0x96 0x74
+  mc.disableCrc();      // Bytes: 0x8B 0x04 0x7B 0x43
+  mc.clearResetFlag();  // Bytes: 0xA9 0x00 0x04
+  mc.setMaxAcceleration(1, 140);
+  mc.setMaxDeceleration(1, 300);
+  mc.setMaxAcceleration(2, 140);
+  mc.setMaxDeceleration(2, 300);
 
   // give the line a moment to settle
   delay(50);
@@ -57,6 +68,17 @@ void loop() {
 
     //float convexity = qtr.getLineConvexity(sensorValues);
     //Serial.println(convexity);
+
+    if (millis() & 2048)
+    {
+      mc.setSpeed(1, 800);
+      mc.setSpeed(2, 800);
+    }
+    else
+    {
+      mc.setSpeed(1, -800);
+      mc.setSpeed(2, 800);
+    }
   }
 
   bool stop = handleWiFi(); // UDP logic

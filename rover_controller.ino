@@ -74,37 +74,50 @@ void loop() {
     sensor.update();
 
     static unsigned long lastCheck = 0;
-    const unsigned long interval = 200;
+    const unsigned long interval = 500;
     unsigned long now = millis();
 
     static uint16_t pos = 4000; // keep previous position if not updated
     static uint16_t raw[9];
+    pos = qtr.readLineBlack(raw);
 
     if (now - lastCheck > interval) {
         lastCheck = now;
         
+        Serial.print("Dist: ");
         Serial.println(sensor.getMean());
 
-        pos = qtr.readLineBlack(raw);
-
-        for (uint8_t i = 0; i < 9; i++) {
-            Serial.print(raw[i]);
-            Serial.write(',');
-        }
+        // for (uint8_t i = 0; i < 9; i++) {
+        //     Serial.print(raw[i]);
+        //     Serial.write(',');
+        // }
 
         Serial.print("Pos: ");
         Serial.println(pos);
     }
 
-    if (millis() & 2048) {
-        mc.setSpeed(1, 200);
-        mc.setSpeed(2, 400);
+    now = millis();
+    unsigned long t = now % 20000;  // Loop every 20 seconds
+
+    if (t < 5000) {
+      // 0–5s: Forward
+      mc.setSpeed(1, 600);
+      mc.setSpeed(2, 600);
+    } else if (t < 10000) {
+      // 5–10s: Backward
+      mc.setSpeed(1, -600);
+      mc.setSpeed(2, -600);
+    } else if (t < 15000) {
+      // 10–15s: Forward-Left
+      mc.setSpeed(1, 300); // Slow left
+      mc.setSpeed(2, 600); // Normal right
     } else {
-        mc.setSpeed(1, -400);
-        mc.setSpeed(2, 200);
+      // 15–20s: Forward-Right
+      mc.setSpeed(1, 600); // Normal left
+      mc.setSpeed(2, 300); // Slow right
     }
   }
-
+  
 
   bool stop = handleWiFi(); // UDP logic
   if (stop == true) {

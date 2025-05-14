@@ -3,15 +3,16 @@
 #include <WiFiUdp.h>
 
 // WiFi credentials
-static const char ssid[] = "test";
-static const char password[] = "password"; // To be filled in once announced
-
-static IPAddress deviceIP(192, 168, 155, 43); // Replace with your assigned static IP
+static const char ssid[] = "PhaseSpaceNetwork_2.4G";
+static const char password[] = "8igMacNet";
+// 192 168 155 43
+// 192 168 0 46
+static IPAddress deviceIP(192, 168, 0, 46); // Replace with your assigned static IP
 static IPAddress gateway(192, 168, 155, 1);   // May need to be updated
 static IPAddress subnet(255, 255, 255, 0);
 
 // UDP configuration
-static const unsigned int listenPort = 3000; // Port for all robots
+static const unsigned int listenPort = 55500; // Port for all robots
 static WiFiUDP Udp;
 
 // Buffer size for UDP packets

@@ -91,6 +91,13 @@ void loop() {
 
       Serial.print("Pos: ");
       Serial.println(pos);
+
+      if (qtr.isLineDetected(0.01)) {
+        Serial.println("line detected");
+      }
+      else {
+        Serial.println("no line detected");
+      }
   }
 
   now = millis();
@@ -106,12 +113,12 @@ void loop() {
     mc.setSpeed(2, -600);
   } else if (t < 15000) {
     // 10–15s: Forward-Left
-    mc.setSpeed(1, 300); // Slow left
-    mc.setSpeed(2, 600); // Normal right
+    mc.setSpeed(1, 300); 
+    mc.setSpeed(2, 600); 
   } else {
     // 15–20s: Forward-Right
-    mc.setSpeed(1, 600); // Normal left
-    mc.setSpeed(2, 300); // Slow right
+    mc.setSpeed(1, 600);
+    mc.setSpeed(2, 300);
   }
 
   if (robot_enabled == false) {

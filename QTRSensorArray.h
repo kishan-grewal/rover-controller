@@ -13,6 +13,8 @@ public:
 
     void printCalibration(); // Optional debug output
 
+    bool isLineDetected(float confidence);
+
 private:
     uint16_t readRC(uint8_t pin);
     void readSensors(uint16_t *dest);

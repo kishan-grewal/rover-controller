@@ -97,3 +97,32 @@ void QTRSensorArray::printCalibration()
     }
     Serial.println();
 }
+
+bool QTRSensorArray::isLineDetected(float confidence)
+{
+    uint16_t raw[NUM_SENSORS];
+    readSensors(raw);
+
+    // Normalise each sensor reading using the calibration values
+    uint16_t values[NUM_SENSORS];
+    for (uint8_t i = 0; i < NUM_SENSORS; i++) {
+        int32_t span = (int32_t)sensorMax[i] - (int32_t)sensorMin[i];
+        if (span <= 0) span = 1;
+
+        int32_t delta = (int32_t)raw[i] - (int32_t)sensorMin[i];
+        if (delta < 0) delta = 0;
+        if (delta > span) delta = span;
+
+        int32_t x = delta * 1000 / span;
+        values[i] = constrain(x, 0, 1000);
+    }
+
+    // Compute average of the 9 values (each in range 0–1000)
+    uint32_t total = 0;
+    for (uint8_t i = 0; i < NUM_SENSORS; i++) {
+        total += values[i];
+    }
+    float average = total / (1000.0f * NUM_SENSORS); // Normalised to 0–1
+    Serial.println(average);
+    return average >= confidence;
+}

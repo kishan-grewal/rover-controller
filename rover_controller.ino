@@ -19,7 +19,7 @@ MotoronI2C mc(0x10);
 int last_steady_state = LOW;       // the previous steady state from the input pin
 int last_flickerable_state = LOW;  // the previous flickerable state from the input pin
 int current_state;                 // the current reading from the input pin
-bool robot_enabled = true;
+bool robot_enabled = false;
 
 unsigned long last_debounce_time = 0;  // the last time the output pin was toggled
 
@@ -47,6 +47,8 @@ void setup() {
   mc.setMaxDeceleration(1, 300);
   mc.setMaxAcceleration(2, 140);
   mc.setMaxDeceleration(2, 300);
+  mc.setMaxAcceleration(3, 140);
+  mc.setMaxDeceleration(3, 300);
 
   // give the line a moment to settle
   delay(50);
@@ -58,7 +60,8 @@ void setup() {
   qtr.calibrate();
   qtr.printCalibration();
 
-  delay(12000);
+  //delay(12000);
+  delay(6000);
 
   // read the real button state once, and use that
   int initState = digitalRead(BUTTON_PIN);
@@ -106,26 +109,29 @@ void loop() {
 
   if (t < 5000) {
     // 0–5s: Forward
-    mc.setSpeed(1, 600 * -1);
     mc.setSpeed(2, 600);
+    mc.setSpeed(3, 600 * -1);
   } else if (t < 10000) {
     // 5–10s: Backward
-    mc.setSpeed(1, -600 * -1);
     mc.setSpeed(2, -600);
+    mc.setSpeed(3, -600 * -1);
   } else if (t < 15000) {
     // 10–15s: Forward-Left
-    mc.setSpeed(1, 300 * -1); 
-    mc.setSpeed(2, 600); 
+    mc.setSpeed(2, 300); 
+    mc.setSpeed(3, 600 * -1); 
   } else {
     // 15–20s: Forward-Right
-    mc.setSpeed(1, 600 * -1);
-    mc.setSpeed(2, 300);
+    mc.setSpeed(2, 600);
+    mc.setSpeed(3, 300 * -1);
   }
 
   if (robot_enabled == false) {
     mc.setSpeed(1, 0);
     mc.setSpeed(2, 0);
+    mc.setSpeed(3, 0);
   }
+
+  mc.setSpeed(1, 300);
 
   bool stop = handleWiFi(); // UDP logic
   if (stop == true) {

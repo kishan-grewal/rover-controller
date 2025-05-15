@@ -3,11 +3,14 @@
 #include <WiFiUdp.h>
 
 // WiFi credentials
-static const char ssid[] = "PhaseSpaceNetwork_2.4G";
-static const char password[] = "8igMacNet";
+static const char ssid[] = "test";
+static const char password[] = "password";
+// static const char ssid[] = "PhaseSpaceNetwork_2.4G";
+// static const char password[] = "8igMacNet";
 // 192 168 155 43
 // 192 168 0 46
-static IPAddress deviceIP(192, 168, 0, 46); // Replace with your assigned static IP
+static IPAddress deviceIP(192, 168, 155, 43); // Replace with your assigned static IP
+// static IPAddress deviceIP(192, 168, 0, 46); // Replace with your assigned static IP
 static IPAddress gateway(192, 168, 155, 1);   // May need to be updated
 static IPAddress subnet(255, 255, 255, 0);
 

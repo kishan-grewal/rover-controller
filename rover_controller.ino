@@ -84,15 +84,16 @@ void loop() {
       Serial.print("Dist: ");
       Serial.println(sensor.getMean());
 
-      // for (uint8_t i = 0; i < 9; i++) {
-      //     Serial.print(raw[i]);
-      //     Serial.write(',');
-      // }
+      for (uint8_t i = 0; i < 9; i++) {
+          Serial.print(raw[i]);
+          Serial.write(',');
+      }
 
       Serial.print("Pos: ");
       Serial.println(pos);
 
-      if (qtr.isLineDetected(0.01)) {
+      // 0.1 or 0.01
+      if (qtr.isLineDetected(0.10)) {
         Serial.println("line detected");
       }
       else {
@@ -105,19 +106,19 @@ void loop() {
 
   if (t < 5000) {
     // 0–5s: Forward
-    mc.setSpeed(1, 600);
+    mc.setSpeed(1, 600 * -1);
     mc.setSpeed(2, 600);
   } else if (t < 10000) {
     // 5–10s: Backward
-    mc.setSpeed(1, -600);
+    mc.setSpeed(1, -600 * -1);
     mc.setSpeed(2, -600);
   } else if (t < 15000) {
     // 10–15s: Forward-Left
-    mc.setSpeed(1, 300); 
+    mc.setSpeed(1, 300 * -1); 
     mc.setSpeed(2, 600); 
   } else {
     // 15–20s: Forward-Right
-    mc.setSpeed(1, 600);
+    mc.setSpeed(1, 600 * -1);
     mc.setSpeed(2, 300);
   }
 

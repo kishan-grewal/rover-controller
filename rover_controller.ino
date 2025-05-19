@@ -61,6 +61,7 @@ void setup() {
   qtr.printCalibration();
 
   //delay(12000);
+
   delay(6000);
 
   // read the real button state once, and use that

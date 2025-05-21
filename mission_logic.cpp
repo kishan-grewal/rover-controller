@@ -15,8 +15,8 @@ MissionLogic::MissionLogic(QTRSensorArray* qtr1, QTRSensorArray* qtr2,
 void MissionLogic::lineFollowing() {
   _lastMissionTime = millis();
 
-  static uint16_t values[9];
-  uint16_t position = _qtr1->readLineBlack(values);
+  _qtr1->updateSensors();  // Read raw + normalised
+  uint16_t position = _qtr1->readLineBlack(); // Use normalised data
   int error = 4000 - position;
   float correction = _pidLine->compute(error);
 
@@ -69,9 +69,10 @@ void MissionLogic::lunarSurfaceDrive() {
 void MissionLogic::floorIsLava() {
   _lastMissionTime = millis();
 
+  _qtr2->updateSensors();
+
   if (_qtr2->isLineDetected(0.2)) {
-    static uint16_t values[9];
-    uint16_t position = _qtr2->readLineBlack(values);
+    uint16_t position = _qtr2->readLineBlack();
     int error = 4000 - position;
     float correction = _pidLine->compute(error);
     int leftSpeed = constrain(150 - correction, -_maxSpeedDrive, _maxSpeedDrive);

@@ -32,34 +32,8 @@ void QTRSensorArray::readSensors(uint16_t *dest)
     }
 }
 
-void QTRSensorArray::calibrate(uint32_t durationMs, uint16_t delayMs)
+void QTRSensorArray::normalise(const uint16_t *raw, uint16_t *normalised)
 {
-    // Initialise min and max arrays
-    for (uint8_t i = 0; i < NUM_SENSORS; i++) {
-        sensorMin[i] = TIMEOUT_US;
-        sensorMax[i] = 0;
-    }
-
-    unsigned long start = millis();
-
-    while (millis() - start < durationMs) {
-        uint16_t v[NUM_SENSORS];
-        readSensors(v);
-
-        for (uint8_t i = 0; i < NUM_SENSORS; i++) {
-            if (v[i] < sensorMin[i]) sensorMin[i] = v[i];
-            if (v[i] > sensorMax[i]) sensorMax[i] = v[i];
-        }
-
-        delay(delayMs); // user-defined delay
-    }
-}
-
-uint16_t QTRSensorArray::readLineBlack(uint16_t *raw)
-{
-    readSensors(raw);
-    uint16_t value[NUM_SENSORS];
-
     for (uint8_t i = 0; i < NUM_SENSORS; i++) {
         int32_t span = (int32_t)sensorMax[i] - (int32_t)sensorMin[i];
         if (span <= 0) span = 1;
@@ -69,14 +43,33 @@ uint16_t QTRSensorArray::readLineBlack(uint16_t *raw)
         if (delta > span) delta = span;
 
         int32_t x = delta * 1000 / span;
-        value[i] = constrain(x, 0, 1000);
+        normalised[i] = constrain(x, 0, 1000);
     }
+}
 
+void QTRSensorArray::updateSensors()
+{
+    readSensors(_raw);
+    normalise(_raw, _normalised);
+}
+
+const uint16_t* QTRSensorArray::getRaw() const
+{
+    return _raw;
+}
+
+const uint16_t* QTRSensorArray::getNormalised() const
+{
+    return _normalised;
+}
+
+uint16_t QTRSensorArray::readLineBlack()
+{
     uint32_t numerator = 0, denominator = 0;
     for (uint8_t i = 0; i < NUM_SENSORS; i++) {
-        if (value[i] > 10) {
-            numerator += (uint32_t)value[i] * (i * 1000);
-            denominator += value[i];
+        if (_normalised[i] > 100) {
+            numerator += (uint32_t)_normalised[i] * (i * 1000);
+            denominator += _normalised[i];
         }
     }
 
@@ -85,6 +78,36 @@ uint16_t QTRSensorArray::readLineBlack(uint16_t *raw)
     }
 
     return lastResult;
+}
+
+void QTRSensorArray::calibrate()
+{
+    for (uint8_t i = 0; i < NUM_SENSORS; i++) {
+        sensorMin[i] = TIMEOUT_US;
+        sensorMax[i] = 0;
+    }
+
+    for (uint16_t n = 0; n < CALIB_TIMES; n++) {
+        uint16_t v[NUM_SENSORS];
+        readSensors(v);
+        for (uint8_t i = 0; i < NUM_SENSORS; i++) {
+            if (v[i] < sensorMin[i]) sensorMin[i] = v[i];
+            if (v[i] > sensorMax[i]) sensorMax[i] = v[i];
+        }
+        delay(5);
+    }
+}
+
+bool QTRSensorArray::isLineDetected(float confidence)
+{
+    // Compute average of the 9 values (each in range 0–1000)
+    uint32_t total = 0;
+    for (uint8_t i = 0; i < NUM_SENSORS; i++) {
+        total += _normalised[i];
+    }
+    float average = total / (1000.0f * NUM_SENSORS); // Normalised to 0–1
+    Serial.println(average);
+    return average >= confidence;
 }
 
 void QTRSensorArray::printCalibration()
@@ -101,33 +124,4 @@ void QTRSensorArray::printCalibration()
         Serial.print(",");
     }
     Serial.println();
-}
-
-bool QTRSensorArray::isLineDetected(float confidence)
-{
-    uint16_t raw[NUM_SENSORS];
-    readSensors(raw);
-
-    // Normalise each sensor reading using the calibration values
-    uint16_t values[NUM_SENSORS];
-    for (uint8_t i = 0; i < NUM_SENSORS; i++) {
-        int32_t span = (int32_t)sensorMax[i] - (int32_t)sensorMin[i];
-        if (span <= 0) span = 1;
-
-        int32_t delta = (int32_t)raw[i] - (int32_t)sensorMin[i];
-        if (delta < 0) delta = 0;
-        if (delta > span) delta = span;
-
-        int32_t x = delta * 1000 / span;
-        values[i] = constrain(x, 0, 1000);
-    }
-
-    // Compute average of the 9 values (each in range 0–1000)
-    uint32_t total = 0;
-    for (uint8_t i = 0; i < NUM_SENSORS; i++) {
-        total += values[i];
-    }
-    float average = total / (1000.0f * NUM_SENSORS); // Normalised to 0–1
-    Serial.println(average);
-    return average >= confidence;
 }

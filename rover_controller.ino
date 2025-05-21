@@ -12,7 +12,6 @@
 #include <Motoron.h>
 
 Average<float> ave_ldr(100);
-Average<float> ave_pos(100);
 
 MotoronI2C mc1(0x10);
 MotoronI2C mc2(0x0B);
@@ -81,7 +80,7 @@ void setup() {
 
   //delay(12000);
 
-  delay(6000);
+  delay(3000);
 
   // read the real button state once, and use that
   int initState = digitalRead(BUTTON_PIN);
@@ -97,14 +96,14 @@ void loop() {
   float filtered_ldr = ldr_alpha * ldr + (1 - ldr_alpha) * ldr;
   ave_ldr.push(filtered_ldr);
 
+  qtr.updateSensors();
+  uint16_t pos = qtr.readLineBlack();
+  const uint16_t* raw = qtr.getRaw();
+  const uint16_t* norm = qtr.getNormalised();
+
   static unsigned long lastCheck = 0;
   const unsigned long interval = 500;
   unsigned long now = millis();
-
-  static uint16_t pos = 4000; // keep previous position if not updated
-  static uint16_t raw[9];
-  pos = qtr.readLineBlack(raw);
-  ave_pos.push(pos);
 
   if (now - lastCheck > interval) {
       lastCheck = now;
@@ -113,17 +112,10 @@ void loop() {
       // Serial.println(sensor.getMean());
 
       for (uint8_t i = 0; i < 9; i++) {
-          Serial.print(raw[i]);
+          Serial.print(norm[i]);
           Serial.write(',');
       }
-
-      float average_pos = ave_pos.mean();
-      Serial.print("M: ");
-      Serial.print(average_pos);
-      Serial.print(" - P: ");
-      Serial.print(pos);
-      Serial.print(" = ");
-      Serial.println(ave_pos.mean() - pos);
+      Serial.println(pos);
 
       // // 0.1 or 0.01
       // if (qtr.isLineDetected(0.10)) {
@@ -170,10 +162,6 @@ void loop() {
 
   bool stop = handleWiFi(); // UDP logic
   if (stop == true) {
-    robot_enabled = false;
-  }
-
-  if (abs(ave_pos.mean() - pos) > 1500.0) {
     robot_enabled = false;
   }
 

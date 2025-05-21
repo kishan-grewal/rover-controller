@@ -8,7 +8,10 @@ public:
     QTRSensorArray(const uint8_t sensorPins[9], uint8_t ledPin);
 
     void begin();
-    void calibrate();
+
+    // Calibrate for a specified duration (ms) with a sampling delay (ms)
+    void calibrate(uint32_t durationMs = 10000, uint16_t delayMs = 5);
+
     uint16_t readLineBlack(uint16_t *raw); // returns position, fills raw[]
 
     void printCalibration(); // Optional debug output
@@ -21,7 +24,6 @@ private:
 
     static const uint8_t NUM_SENSORS = 9;
     static const uint16_t TIMEOUT_US = 3000;
-    static const uint16_t CALIB_TIMES = 3000;
 
     const uint8_t* _sensorPins;
     uint8_t _ledPin;

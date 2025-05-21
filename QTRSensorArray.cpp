@@ -32,21 +32,26 @@ void QTRSensorArray::readSensors(uint16_t *dest)
     }
 }
 
-void QTRSensorArray::calibrate()
+void QTRSensorArray::calibrate(uint32_t durationMs, uint16_t delayMs)
 {
+    // Initialise min and max arrays
     for (uint8_t i = 0; i < NUM_SENSORS; i++) {
         sensorMin[i] = TIMEOUT_US;
         sensorMax[i] = 0;
     }
 
-    for (uint16_t n = 0; n < CALIB_TIMES; n++) {
+    unsigned long start = millis();
+
+    while (millis() - start < durationMs) {
         uint16_t v[NUM_SENSORS];
         readSensors(v);
+
         for (uint8_t i = 0; i < NUM_SENSORS; i++) {
             if (v[i] < sensorMin[i]) sensorMin[i] = v[i];
             if (v[i] > sensorMax[i]) sensorMax[i] = v[i];
         }
-        delay(5);
+
+        delay(delayMs); // user-defined delay
     }
 }
 
@@ -69,7 +74,7 @@ uint16_t QTRSensorArray::readLineBlack(uint16_t *raw)
 
     uint32_t numerator = 0, denominator = 0;
     for (uint8_t i = 0; i < NUM_SENSORS; i++) {
-        if (value[i] > 100) {
+        if (value[i] > 10) {
             numerator += (uint32_t)value[i] * (i * 1000);
             denominator += value[i];
         }

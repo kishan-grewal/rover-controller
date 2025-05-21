@@ -8,10 +8,11 @@
 #include <WiFiUdp.h>
 
 #include <Wire.h>
-#define Wire Wire1  // Tell all libraries to use the secondary I2C bus
+//#define Wire Wire1  // Tell all libraries to use the secondary I2C bus
 #include <Motoron.h>
 
-MotoronI2C mc(0x10);
+MotoronI2C mc1(0x10);
+MotoronI2C mc2(0x0B);
 
 #define BUTTON_PIN 50
 #define DEBOUNCE_TIME 25
@@ -39,16 +40,31 @@ void setup() {
 
   pinMode(BUTTON_PIN, INPUT_PULLUP);
   
-  Wire.begin();
-  mc.reinitialize();    // Bytes: 0x96 0x74
-  mc.disableCrc();      // Bytes: 0x8B 0x04 0x7B 0x43
-  mc.clearResetFlag();  // Bytes: 0xA9 0x00 0x04
-  mc.setMaxAcceleration(1, 140);
-  mc.setMaxDeceleration(1, 300);
-  mc.setMaxAcceleration(2, 140);
-  mc.setMaxDeceleration(2, 300);
-  mc.setMaxAcceleration(3, 140);
-  mc.setMaxDeceleration(3, 300);
+  // --- Controller 1 on secondary bus (Wire1) ---
+  Serial.println("Initializing controller 1 on Wire1 (I2C1)...");
+  mc1.setBus(&Wire1);      // point Motoron at Wire1
+  Wire1.begin();           // start secondary I2C
+  mc1.reinitialize();
+  mc1.disableCrc();
+  mc1.clearResetFlag();
+  mc1.setMaxAcceleration(3, 280);
+  mc1.setMaxDeceleration(3, 600);
+  mc1.setMaxAcceleration(2, 280);
+  mc1.setMaxDeceleration(2, 600);
+
+  // --- Controller 2 on primary bus (Wire) ---
+  Serial.println("Initializing controller 2 on Wire (I2C0)...");
+  mc2.setBus(&Wire);       // point Motoron at Wire
+  Wire.begin();            // start primary I2C
+  mc2.reinitialize();
+  mc2.disableCrc();
+  mc2.clearResetFlag();
+  mc2.setMaxAcceleration(3, 280);
+  mc2.setMaxDeceleration(3, 600);
+  mc2.setMaxAcceleration(2, 280);
+  mc2.setMaxDeceleration(2, 600);
+
+  Serial.println("Initialization complete");
 
   // give the line a moment to settle
   delay(50);
@@ -110,29 +126,31 @@ void loop() {
 
   if (t < 5000) {
     // 0–5s: Forward
-    mc.setSpeed(2, 600);
-    mc.setSpeed(3, 600 * -1);
+    mc2.setSpeed(2, 1200);
+    mc2.setSpeed(3, 1200 * -1);
   } else if (t < 10000) {
     // 5–10s: Backward
-    mc.setSpeed(2, -600);
-    mc.setSpeed(3, -600 * -1);
+    mc2.setSpeed(2, -1200);
+    mc2.setSpeed(3, -1200 * -1);
   } else if (t < 15000) {
     // 10–15s: Forward-Left
-    mc.setSpeed(2, 300); 
-    mc.setSpeed(3, 600 * -1); 
+    mc2.setSpeed(2, 600); 
+    mc2.setSpeed(3, 1200 * -1); 
   } else {
     // 15–20s: Forward-Right
-    mc.setSpeed(2, 600);
-    mc.setSpeed(3, 300 * -1);
+    mc2.setSpeed(2, 1200);
+    mc2.setSpeed(3, 600 * -1);
   }
+
+  mc1.setSpeed(2, 600);
+  mc1.setSpeed(3, 600);
 
   if (robot_enabled == false) {
-    mc.setSpeed(1, 0);
-    mc.setSpeed(2, 0);
-    mc.setSpeed(3, 0);
+    mc1.setSpeed(2, 0);
+    mc1.setSpeed(3, 0);
+    mc2.setSpeed(2, 0);
+    mc2.setSpeed(3, 0);
   }
-
-  mc.setSpeed(1, 300);
 
   bool stop = handleWiFi(); // UDP logic
   if (stop == true) {

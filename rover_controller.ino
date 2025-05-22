@@ -89,6 +89,8 @@ void setup() {
   last_debounce_time = millis();
 }
 
+int right_confidence = 0;
+
 void loop() {
   sensor.update();
   long ldr = analogRead(A1);
@@ -100,9 +102,24 @@ void loop() {
   uint16_t pos = qtr.readLineBlack();
   const uint16_t* raw = qtr.getRaw();
   const uint16_t* norm = qtr.getNormalised();
+  bool line[9] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
+  for (uint8_t i = 0; i < 9; i++) {
+          line[i] = norm[i] > 400.0;
+  }
+  bool right = line[8] & line[7] & line[6] & line[5];
+  if (right == true) {
+    right_confidence++;
+  }
+  else {
+    right_confidence = 0;
+  }
+  if (right_confidence >= 10) {
+    Serial.println("RIGHT HAND TURN");
+    delay(3000);
+  }
 
   static unsigned long lastCheck = 0;
-  const unsigned long interval = 500;
+  const unsigned long interval = 100;
   unsigned long now = millis();
 
   if (now - lastCheck > interval) {
@@ -112,10 +129,18 @@ void loop() {
       // Serial.println(sensor.getMean());
 
       for (uint8_t i = 0; i < 9; i++) {
-          Serial.print(norm[i]);
+          //Serial.print(norm[i]);
+          Serial.print(line[i]);
           Serial.write(',');
       }
-      Serial.println(pos);
+      Serial.println();
+      // for (uint8_t i = 0; i < 9; i++) {
+      //     Serial.print(norm[i]);
+      //     bool line = norm[i] > 300.0;
+      //     Serial.write(',');
+      // }
+      // Serial.println();
+      // Serial.println(pos);
 
       // // 0.1 or 0.01
       // if (qtr.isLineDetected(0.10)) {

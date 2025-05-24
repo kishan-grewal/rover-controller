@@ -3,6 +3,9 @@
 
 #include <Arduino.h>
 
+extern float pid_values[3];
+extern bool pid_updated;
+
 void setupWiFi();
 
 bool handleWiFi();

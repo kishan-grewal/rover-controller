@@ -1,16 +1,17 @@
 #include <Arduino.h>
+#include "wifi_logic.h"
 #include <WiFi.h>
 #include <WiFiUdp.h>
 
 // WiFi credentials
-// static const char ssid[] = "test";
-// static const char password[] = "password";
-static const char ssid[] = "PhaseSpaceNetwork_2.4G";
-static const char password[] = "8igMacNet";
+static const char ssid[] = "test";
+static const char password[] = "password";
+// static const char ssid[] = "PhaseSpaceNetwork_2.4G";
+// static const char password[] = "8igMacNet";
 // 192 168 155 43
 // 192 168 0 46
-//static IPAddress deviceIP(192, 168, 155, 43); // Replace with your assigned static IP
-static IPAddress deviceIP(192, 168, 0, 46); // Replace with your assigned static IP
+static IPAddress deviceIP(192, 168, 155, 43); // Replace with your assigned static IP
+//static IPAddress deviceIP(192, 168, 0, 46); // Replace with your assigned static IP
 static IPAddress gateway(192, 168, 155, 1);   // May need to be updated
 static IPAddress subnet(255, 255, 255, 0);
 
@@ -120,43 +121,57 @@ static void checkWiFiConnection() {
 
 // Process UDP packets, return true if stop command received
 static bool processUdpPackets() {
+  pid_updated = false;  // Default to false every loop
+
   int packetSize = Udp.parsePacket();
   if (packetSize) {
-    // Clear buffer first to avoid residual data
     memset(packetBuffer, 0, UDP_PACKET_SIZE + 1);
-    
-    // Read the packet into the buffer
     int len = Udp.read(packetBuffer, UDP_PACKET_SIZE);
-    
-    // Ensure null termination
     if (len > 0) {
       packetBuffer[len] = '\0';
     }
-    
-    // Log the received packet
-    Serial.print("Received UDP packet from ");
-    Serial.print(Udp.remoteIP());
-    Serial.print(":");
-    Serial.print(Udp.remotePort());
-    Serial.print(" - Length: ");
-    Serial.print(len);
-    Serial.print(" - Data: ");
+
+    Serial.print("Received UDP packet: ");
     Serial.println(packetBuffer);
-    
-    // Check for the stop command - exact match for "Stop"
-    // Note: strcmp returns 0 when strings are equal
+
+    // Check for "Stop"
     if (strcmp(packetBuffer, STOP_COMMAND) == 0) {
-      Serial.println("STOP command received! Emergency stop activated!");
-      
-      // Optional: Send acknowledgment to sender
+      Serial.println("STOP command received!");
       Udp.beginPacket(Udp.remoteIP(), Udp.remotePort());
-      const char* ackMsg = "Stop command received";
-      Udp.write((uint8_t*)ackMsg, strlen(ackMsg));
+      Udp.write("Stop command received");
       Udp.endPacket();
-      
-      return true; // Return true to indicate stop command received
+      return true;
+    }
+
+    // Try to parse PID values
+    float values[3];
+    int count = 0;
+    char* token = strtok(packetBuffer, ",");
+
+    while (token != NULL && count < 3) {
+      values[count] = atof(token);
+      token = strtok(NULL, ",");
+      count++;
+    }
+
+    if (count == 3 && token == NULL) {
+      pid_values[0] = values[0]; // kp
+      pid_values[1] = values[1]; // ki
+      pid_values[2] = values[2]; // kd
+      pid_updated = true;
+
+      Serial.print("Updated PID values: ");
+      Serial.print(pid_values[0]); Serial.print(", ");
+      Serial.print(pid_values[1]); Serial.print(", ");
+      Serial.println(pid_values[2]);
+
+      Udp.beginPacket(Udp.remoteIP(), Udp.remotePort());
+      Udp.write("PID values updated");
+      Udp.endPacket();
+    } else {
+      Serial.println("Invalid PID format. Expected: kp,ki,kd");
     }
   }
-  
-  return false; // No stop command received
+
+  return false; // not a stop command
 }

@@ -82,19 +82,24 @@ uint16_t QTRSensorArray::readLineBlack()
 
 void QTRSensorArray::calibrate()
 {
-    for (uint8_t i = 0; i < NUM_SENSORS; i++) {
-        sensorMin[i] = TIMEOUT_US;
-        sensorMax[i] = 0;
-    }
+    // for (uint8_t i = 0; i < NUM_SENSORS; i++) {
+    //     sensorMin[i] = TIMEOUT_US;
+    //     sensorMax[i] = 0;
+    // }
 
-    for (uint16_t n = 0; n < CALIB_TIMES; n++) {
-        uint16_t v[NUM_SENSORS];
-        readSensors(v);
-        for (uint8_t i = 0; i < NUM_SENSORS; i++) {
-            if (v[i] < sensorMin[i]) sensorMin[i] = v[i];
-            if (v[i] > sensorMax[i]) sensorMax[i] = v[i];
-        }
-        delay(5);
+    // for (uint16_t n = 0; n < CALIB_TIMES; n++) {
+    //     uint16_t v[NUM_SENSORS];
+    //     readSensors(v);
+    //     for (uint8_t i = 0; i < NUM_SENSORS; i++) {
+    //         if (v[i] < sensorMin[i]) sensorMin[i] = v[i];
+    //         if (v[i] > sensorMax[i]) sensorMax[i] = v[i];
+    //     }
+    //     delay(5);
+    // }
+
+    for (uint8_t i = 0; i < NUM_SENSORS; i++) {
+        sensorMin[i] = 20;
+        sensorMax[i] = 1400;
     }
 }
 
@@ -106,7 +111,6 @@ bool QTRSensorArray::isLineDetected(float confidence)
         total += _normalised[i];
     }
     float average = total / (1000.0f * NUM_SENSORS); // Normalised to 0–1
-    Serial.println(average);
     return average >= confidence;
 }
 
@@ -124,4 +128,27 @@ void QTRSensorArray::printCalibration()
         Serial.print(",");
     }
     Serial.println();
+}
+
+void QTRSensorArray::runAveragingPhase(uint16_t* outputArray)
+{
+    uint32_t sum[NUM_SENSORS] = {0};
+    uint16_t readings = 0;
+
+    unsigned long start = millis();
+    while (millis() - start < 5000) {
+        updateSensors();
+        const uint16_t* norm = getNormalised();
+
+        for (uint8_t i = 0; i < NUM_SENSORS; i++) {
+            sum[i] += norm[i];
+        }
+
+        readings++;
+        delay(10); // 100 Hz sampling
+    }
+
+    for (uint8_t i = 0; i < NUM_SENSORS; i++) {
+        outputArray[i] = sum[i] / readings;
+    }
 }

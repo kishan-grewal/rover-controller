@@ -9,8 +9,8 @@
 
 #include <Wire.h>
 #include <Motoron.h>
-MotoronI2C mc1(0x10);
-MotoronI2C mc2(0x0B);
+MotoronI2C mc1(0x10); // on top
+MotoronI2C mc2(0x0B); // at the bottom (since I removed the top to change its address)
 
 #define BUTTON_PIN 50
 #define DEBOUNCE_TIME 25
@@ -31,6 +31,12 @@ uint16_t blackAvg[9];
 
 float pid_values[3] = {0.0, 0.0, 0.0};  // kp, ki, kd
 bool pid_updated = false;              // set true when new values are received
+
+enum State { FOLLOW, TURN_LEFT, TURN_RIGHT, TURN_AROUND, END };
+enum Direction { NONE, LEFT, RIGHT };
+Direction lastPath = NONE; // Start with NONE
+State currentState = FOLLOW;
+float turnBias = 0.0;
 
 void setup() {
   Serial.begin(115200);
@@ -72,15 +78,6 @@ void setup() {
     qtr.calibrate();
     qtr.printCalibration();
 
-    // // 5s each: hold sensor over white, then black
-    // Serial.println("move to white");
-    // delay(1000);
-    // Serial.println("white avg");
-    // qtr.runAveragingPhase(whiteAvg);  // Blocking for 5 seconds
-    // Serial.println("move to black");
-    // delay(1000);
-    // Serial.println("black avg");
-    // qtr.runAveragingPhase(blackAvg);  // Blocking for 5 seconds
   }
 
   {
@@ -90,6 +87,22 @@ void setup() {
     last_flickerable_state = initState;
     last_debounce_time = millis();
   }
+}
+
+void setDrive(float left_speed, float right_speed) {
+  int16_t left = (int16_t)round(left_speed);
+  int16_t right = (int16_t)round(right_speed);
+  left = constrain(left, -800, 800);
+  right = constrain(right, -800, 800);
+  // Set speeds, remembering motor 3 runs opposite
+  mc1.setSpeed(2, left);
+  mc1.setSpeed(3, -right);
+}
+
+void applyDrive(float baseSpeed, float pidBias, float turnBias) {
+  float left_speed = baseSpeed + pidBias + turnBias;
+  float right_speed = baseSpeed - pidBias - turnBias;
+  setDrive(left_speed, right_speed);
 }
 
 void loop() {
@@ -103,6 +116,7 @@ void loop() {
   }
 
   sensor.update();
+
   long ldr = analogRead(A1);
   float ldr_alpha = 0.1;
   float filtered_ldr = ldr_alpha * ldr + (1 - ldr_alpha) * ldr;
@@ -117,8 +131,75 @@ void loop() {
           line[i] = norm[i] > 400.0;
   }
 
-  const unsigned long interval = 100;
+  switch (currentState)
+  {
+    case FOLLOW:
+      if (detectFinish())
+      {
+          currentState = END;
+      }
+      else if (detectJunction())
+      {
+          if (lastPath == NONE)
+          {
+              lastPath = RIGHT;  // First junction: go right
+              turnBias = 30.0;
+          }
+          else if (lastPath == RIGHT)
+          {
+              lastPath = NONE;  // First junction: go right
+              turnBias = 0.0;
+          }
+      }
+      else if (detectLeftTurn())
+      {
+          currentState = TURN_LEFT;
+      }
+      else if (detectRightTurn())
+      {
+          currentState = TURN_RIGHT;
+      }
+      else if (lineEnded())
+      {
+          currentState = TURN_AROUND;
+      }
+      followLinePIDWithBias(turnBias);
+      break;
 
+    case TURN_LEFT:
+        performLeftTurn();
+        if (turnComplete())
+        {
+            lastPath = LEFT;  // Update lastPath to indicate left turn
+            currentState = FOLLOW;
+        }
+        break;
+
+    case TURN_RIGHT:
+        performRightTurn();
+        if (turnComplete())
+        {
+            lastPath = RIGHT;  // Update lastPath to indicate right turn
+            currentState = FOLLOW;
+        }
+        break;
+
+    case TURN_AROUND:
+        performTurnAround();
+        if (turnComplete())
+        {
+            // Maintain lastPath for backtracking
+            currentState = FOLLOW;
+        }
+        break;
+
+    case END:
+        robot_enabled = false;
+        break;
+  }
+
+  // print interval
+  const unsigned long interval = 100;
   static unsigned long lastCheck = 0;
   unsigned long now = millis();
   if (now - lastCheck > interval) {
@@ -131,13 +212,10 @@ void loop() {
   }
 
   if (robot_enabled == false) {
-    mc1.setSpeed(2, 0);
-    mc1.setSpeed(3, 0);
+    setDrive(0.0, 0.0);
     mc2.setSpeed(2, 0);
     mc2.setSpeed(3, 0);
   }
-
-  int x = 50;
 
   {
     // bool stop = handleWiFi(); // UDP logic

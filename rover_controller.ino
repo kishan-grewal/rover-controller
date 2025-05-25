@@ -25,7 +25,8 @@ DistanceSensor sensor(A0);
 
 const uint8_t SENSOR_PINS[9] = {24, 25, 26, 27, 28, 29, 30, 31, 32};
 const uint8_t LED_PIN = 22;
-QTRSensorArray qtr(SENSOR_PINS, LED_PIN);
+QTRSensorArray qtrL(SENSOR_PINS, LED_PIN);
+QTRSensorArray qtrR(SENSOR_PINS, LED_PIN);
 uint16_t whiteAvg[9];
 uint16_t blackAvg[9];
 
@@ -71,13 +72,19 @@ void setup() {
   }
 
   {
-    Serial.print("Calibrating");
+    Serial.print("Calibrating L");
     delay(50);
-    qtr.begin();
+    qtrL.begin();
     delay(700);
-    qtr.calibrate();
-    qtr.printCalibration();
+    qtrL.calibrate();
+    qtrL.printCalibration();
 
+    Serial.print("Calibrating R");
+    delay(50);
+    qtrR.begin();
+    delay(700);
+    qtrR.calibrate();
+    qtrR.printCalibration();
   }
 
   {
@@ -105,6 +112,32 @@ void applyDrive(float baseSpeed, float pidBias, float turnBias) {
   setDrive(left_speed, right_speed);
 }
 
+float calculatePos(const uint16_t* norm1, const uint16_t* norm2) {
+      float x = 1.0;
+      float y = 2.0;
+
+      float S_m = 0.0;
+      float S_n = 0.0;
+      float weighted_sum = 0.0;
+      float M = 0.0;
+    // Left side (norm1)
+    for (int i = 0; i < 9; i++) {
+        S_m += norm1[i];
+        float pos = -(y / 2.0) - (8 - i) * x;  // Position for norm1[i]
+        weighted_sum += norm1[i] * pos;
+    }
+    // Right side (norm2)
+    for (int i = 0; i < 9; i++) {
+        S_n += norm2[i];
+        float pos = (y / 2.0) + i * x;  // Position for norm2[i]
+        weighted_sum += norm2[i] * pos;
+    }
+    M = S_m + S_n;
+    float center_of_mass = weighted_sum / M;
+    float pos_result = 1000 * center_of_mass / x;
+    return pos_result;
+}
+
 void loop() {
   if (pid_updated == true) {
     for (int i = 0; i < 3; i++) {
@@ -122,93 +155,97 @@ void loop() {
   float filtered_ldr = ldr_alpha * ldr + (1 - ldr_alpha) * ldr;
   ave_ldr.push(filtered_ldr);
 
-  qtr.updateSensors();
-  uint16_t pos = qtr.readLineBlack();
-  const uint16_t* raw = qtr.getRaw();
-  const uint16_t* norm = qtr.getNormalised();
-  bool line[9] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
-  for (uint8_t i = 0; i < 9; i++) {
-          line[i] = norm[i] > 400.0;
-  }
+  qtrL.updateSensors();
+  const uint16_t* rawL = qtrL.getRaw();
+  const uint16_t* normL = qtrL.getNormalised();
+  qtrR.updateSensors();
+  const uint16_t* rawR = qtrL.getRaw();
+  const uint16_t* normR = qtrL.getNormalised();
 
-  switch (currentState)
-  {
-    case FOLLOW:
-      if (detectFinish())
-      {
-          currentState = END;
-      }
-      else if (detectJunction())
-      {
-          if (lastPath == NONE)
-          {
-              lastPath = RIGHT;  // First junction: go right
-              turnBias = 30.0;
-          }
-          else if (lastPath == RIGHT)
-          {
-              lastPath = NONE;  // First junction: go right
-              turnBias = 0.0;
-          }
-      }
-      else if (detectLeftTurn())
-      {
-          currentState = TURN_LEFT;
-      }
-      else if (detectRightTurn())
-      {
-          currentState = TURN_RIGHT;
-      }
-      else if (lineEnded())
-      {
-          currentState = TURN_AROUND;
-      }
-      followLinePIDWithBias(turnBias);
-      break;
+  // switch (currentState)
+  // {
+  //   case FOLLOW:
+  //     if (detectFinish())
+  //     {
+  //         currentState = END;
+  //     }
+  //     else if (detectJunction())
+  //     {
+  //         if (lastPath == NONE)
+  //         {
+  //             lastPath = RIGHT;  // First junction: go right
+  //             turnBias = 30.0;
+  //         }
+  //         else if (lastPath == RIGHT)
+  //         {
+  //             lastPath = NONE;  // First junction: go right
+  //             turnBias = 0.0;
+  //         }
+  //     }
+  //     else if (detectLeftTurn())
+  //     {
+  //         currentState = TURN_LEFT;
+  //     }
+  //     else if (detectRightTurn())
+  //     {
+  //         currentState = TURN_RIGHT;
+  //     }
+  //     else if (lineEnded())
+  //     {
+  //         currentState = TURN_AROUND;
+  //     }
+  //     followLinePIDWithBias(turnBias);
+  //     break;
 
-    case TURN_LEFT:
-        performLeftTurn();
-        if (turnComplete())
-        {
-            lastPath = LEFT;  // Update lastPath to indicate left turn
-            currentState = FOLLOW;
-        }
-        break;
+  //   case TURN_LEFT:
+  //       performLeftTurn();
+  //       if (turnComplete())
+  //       {
+  //           lastPath = LEFT;  // Update lastPath to indicate left turn
+  //           currentState = FOLLOW;
+  //       }
+  //       break;
 
-    case TURN_RIGHT:
-        performRightTurn();
-        if (turnComplete())
-        {
-            lastPath = RIGHT;  // Update lastPath to indicate right turn
-            currentState = FOLLOW;
-        }
-        break;
+  //   case TURN_RIGHT:
+  //       performRightTurn();
+  //       if (turnComplete())
+  //       {
+  //           lastPath = RIGHT;  // Update lastPath to indicate right turn
+  //           currentState = FOLLOW;
+  //       }
+  //       break;
 
-    case TURN_AROUND:
-        performTurnAround();
-        if (turnComplete())
-        {
-            // Maintain lastPath for backtracking
-            currentState = FOLLOW;
-        }
-        break;
+  //   case TURN_AROUND:
+  //       performTurnAround();
+  //       if (turnComplete())
+  //       {
+  //           // Maintain lastPath for backtracking
+  //           currentState = FOLLOW;
+  //       }
+  //       break;
 
-    case END:
-        robot_enabled = false;
-        break;
-  }
+  //   case END:
+  //       robot_enabled = false;
+  //       break;
+  // }
 
-  // print interval
   const unsigned long interval = 100;
   static unsigned long lastCheck = 0;
   unsigned long now = millis();
   if (now - lastCheck > interval) {
       lastCheck = now;
-      for (uint8_t i = 0; i < 9; i++) {
-          Serial.print(norm[i] > 200.0);
-          Serial.print(",");
-      }
-      Serial.println();
+      // for (uint8_t i = 0; i < 9; i++) {
+      //     Serial.print(normL[i] > 200.0);
+      //     Serial.print(",");
+      // }
+      // for (uint8_t i = 0; i < 9; i++) {
+      //     Serial.print(normR[i] > 200.0);
+      //     Serial.print(",");
+      // }
+      // Serial.println();
+
+      float pos = calculatePos(normL, normR);
+      Serial.print(pos);
   }
 
   if (robot_enabled == false) {

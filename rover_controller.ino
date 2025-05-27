@@ -6,6 +6,7 @@
 #include <math.h>
 #include <WiFi.h>
 #include <WiFiUdp.h>
+#include <pid_controller.h>
 
 #include <Wire.h>
 #include <Motoron.h>
@@ -38,6 +39,22 @@ enum Direction { NONE, LEFT, RIGHT };
 Direction lastPath = NONE; // Start with NONE
 State currentState = FOLLOW;
 float turnBias = 0.0;
+
+const float LINE_SPEED = 400.0;
+const float TURN_ADJUST = 200.0;
+PIDController pid_line(0.1, 0.01, 0.01);
+const float TURN_SPEED = 400.0;
+
+// Global variables
+unsigned long turnStartTime = 0;
+bool turnActive = false;
+State activeTurnState = FOLLOW;
+
+// Define durations for each turn (in milliseconds)
+const unsigned long TURN_LEFT_DURATION = 4000;   
+const unsigned long TURN_RIGHT_DURATION = 4000;   
+const unsigned long TURN_AROUND_DURATION = 8000; 
+
 
 void setup() {
   Serial.begin(115200);
@@ -138,6 +155,8 @@ float calculatePos(const uint16_t* norm1, const uint16_t* norm2) {
     return pos_result;
 }
 
+float filtered_ldr = 0.0;
+
 void loop() {
   if (pid_updated == true) {
     for (int i = 0; i < 3; i++) {
@@ -152,82 +171,106 @@ void loop() {
 
   long ldr = analogRead(A1);
   float ldr_alpha = 0.1;
-  float filtered_ldr = ldr_alpha * ldr + (1 - ldr_alpha) * ldr;
+  filtered_ldr = ldr_alpha * ldr + (1 - ldr_alpha) * filtered_ldr;
   ave_ldr.push(filtered_ldr);
 
   qtrL.updateSensors();
   const uint16_t* rawL = qtrL.getRaw();
   const uint16_t* normL = qtrL.getNormalised();
   qtrR.updateSensors();
-  const uint16_t* rawR = qtrL.getRaw();
-  const uint16_t* normR = qtrL.getNormalised();
+  const uint16_t* rawR = qtrR.getRaw();
+  const uint16_t* normR = qtrR.getNormalised();
 
-  // switch (currentState)
-  // {
-  //   case FOLLOW:
-  //     if (detectFinish())
-  //     {
-  //         currentState = END;
-  //     }
-  //     else if (detectJunction())
-  //     {
-  //         if (lastPath == NONE)
-  //         {
-  //             lastPath = RIGHT;  // First junction: go right
-  //             turnBias = 30.0;
-  //         }
-  //         else if (lastPath == RIGHT)
-  //         {
-  //             lastPath = NONE;  // First junction: go right
-  //             turnBias = 0.0;
-  //         }
-  //     }
-  //     else if (detectLeftTurn())
-  //     {
-  //         currentState = TURN_LEFT;
-  //     }
-  //     else if (detectRightTurn())
-  //     {
-  //         currentState = TURN_RIGHT;
-  //     }
-  //     else if (lineEnded())
-  //     {
-  //         currentState = TURN_AROUND;
-  //     }
-  //     followLinePIDWithBias(turnBias);
-  //     break;
+  switch (currentState)
+  {
+    case FOLLOW:
+      turnActive = false;  // Reset turn flag when back to FOLLOW
+      activeTurnState = FOLLOW;
+      if (detectFinish())
+      {
+          currentState = END;
+      }
+      else if (detectJunction())
+      {
+          if (lastPath == NONE)
+          {
+              lastPath = RIGHT;  // First junction: go right
+              turnBias = TURN_ADJUST;
+          }
+          else if (lastPath == RIGHT)
+          {
+              lastPath = NONE;  // First junction: go right
+              turnBias = 0.0;
+          }
+      }
+      else if (detectLeftTurn())
+      {
+          currentState = TURN_LEFT;
+      }
+      else if (detectRightTurn())
+      {
+          currentState = TURN_RIGHT;
+      }
+      else if (lineEnded())
+      {
+          currentState = TURN_AROUND;
+      }
+      float pos = calculatePos(normL, normR);
+      float pidBias = pid_line.compute(pos);
+      applyDrive(LINE_SPEED, pidBias, turnBias);
+      break;
 
-  //   case TURN_LEFT:
-  //       performLeftTurn();
-  //       if (turnComplete())
-  //       {
-  //           lastPath = LEFT;  // Update lastPath to indicate left turn
-  //           currentState = FOLLOW;
-  //       }
-  //       break;
+  case TURN_LEFT:
+    if (!turnActive || activeTurnState != TURN_LEFT) {
+      turnStartTime = millis();
+      turnActive = true;
+      activeTurnState = TURN_LEFT;
+    }
+    if (millis() - turnStartTime < TURN_LEFT_DURATION) {
+      setDrive(-TURN_SPEED, TURN_SPEED);
+    } else {
+      setDrive(0.0, 0.0);
+      turnActive = false;
+      currentState = FOLLOW;
+      lastPath = LEFT;
+    }
+    break;
 
-  //   case TURN_RIGHT:
-  //       performRightTurn();
-  //       if (turnComplete())
-  //       {
-  //           lastPath = RIGHT;  // Update lastPath to indicate right turn
-  //           currentState = FOLLOW;
-  //       }
-  //       break;
+  case TURN_RIGHT:
+    if (!turnActive || activeTurnState != TURN_RIGHT) {
+      turnStartTime = millis();
+      turnActive = true;
+      activeTurnState = TURN_RIGHT;
+    }
+    if (millis() - turnStartTime < TURN_RIGHT_DURATION) {
+      setDrive(TURN_SPEED, -TURN_SPEED);
+    } else {
+      setDrive(0.0, 0.0);
+      turnActive = false;
+      currentState = FOLLOW;
+      lastPath = RIGHT;
+    }
+    break;
 
-  //   case TURN_AROUND:
-  //       performTurnAround();
-  //       if (turnComplete())
-  //       {
-  //           // Maintain lastPath for backtracking
-  //           currentState = FOLLOW;
-  //       }
-  //       break;
+  case TURN_AROUND:
+    if (!turnActive || activeTurnState != TURN_AROUND) {
+      turnStartTime = millis();
+      turnActive = true;
+      activeTurnState = TURN_AROUND;
+    }
+    if (millis() - turnStartTime < TURN_AROUND_DURATION) {
+      setDrive(TURN_SPEED, -TURN_SPEED);
+    } else {
+      setDrive(0.0, 0.0);
+      turnActive = false;
+      currentState = FOLLOW;
+    }
+    break;
 
-  //   case END:
-  //       robot_enabled = false;
-  //       break;
-  // }
+    case END:
+      robot_enabled = false;
+      break;
+  }
 
   const unsigned long interval = 100;
   static unsigned long lastCheck = 0;

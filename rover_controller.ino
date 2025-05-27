@@ -124,8 +124,14 @@ void setDrive(float left_speed, float right_speed) {
 }
 
 void applyDrive(float baseSpeed, float pidBias, float turnBias) {
-  float left_speed = baseSpeed + pidBias + turnBias;
-  float right_speed = baseSpeed - pidBias - turnBias;
+  float left_speed = baseSpeed + turnBias;
+  float right_speed = baseSpeed - turnBias;
+  if (pidBias > 0.0) {
+    left_speed += pidBias;
+  }
+  else {
+    right_speed -= pidBias;
+  }
   setDrive(left_speed, right_speed);
 }
 
@@ -164,7 +170,6 @@ void loop() {
       Serial.print(",");
     }
     Serial.println();
-    delay(10000);
   }
 
   sensor.update();
@@ -184,57 +189,55 @@ void loop() {
   switch (currentState)
   {
     case FOLLOW:
-      turnActive = false;  // Reset turn flag when back to FOLLOW
+      turnActive = false;
       activeTurnState = FOLLOW;
-      if (detectFinish())
-      {
-          currentState = END;
+      
+      // Only run PID and applyDrive every 20ms
+      const unsigned long FOLLOW_PID_INTERVAL = 20;
+      static unsigned long lastFollowPIDTime = 0;
+      unsigned long currentTime = millis();
+      if (currentTime - lastFollowPIDTime >= FOLLOW_PID_INTERVAL) {
+          lastFollowPIDTime = currentTime;
+
+          float pos = calculatePos(normL, normR);
+          float pidBias = pid_line.compute(pos);
+          applyDrive(LINE_SPEED, pidBias, turnBias);
       }
-      else if (detectJunction())
-      {
-          if (lastPath == NONE)
-          {
-              lastPath = RIGHT;  // First junction: go right
-              turnBias = TURN_ADJUST;
-          }
-          else if (lastPath == RIGHT)
-          {
-              lastPath = NONE;  // First junction: go right
-              turnBias = 0.0;
-          }
-      }
-      else if (detectLeftTurn())
-      {
-          currentState = TURN_LEFT;
-      }
-      else if (detectRightTurn())
-      {
-          currentState = TURN_RIGHT;
-      }
-      else if (lineEnded())
-      {
-          currentState = TURN_AROUND;
-      }
-      float pos = calculatePos(normL, normR);
-      float pidBias = pid_line.compute(pos);
-      applyDrive(LINE_SPEED, pidBias, turnBias);
+
+      // if (detectFinish()) {
+      //     currentState = END;
+      // } else if (detectJunction()) {
+      //     if (lastPath == NONE) {
+      //         lastPath = RIGHT;
+      //         turnBias = TURN_ADJUST;
+      //     } else if (lastPath == RIGHT) {
+      //         lastPath = NONE;
+      //         turnBias = 0.0;
+      //     }
+      // } else if (detectLeftTurn()) {
+      //     currentState = TURN_LEFT;
+      // } else if (detectRightTurn()) {
+      //     currentState = TURN_RIGHT;
+      // } else if (lineEnded()) {
+      //     currentState = TURN_AROUND;
+      // }
       break;
 
-  case TURN_LEFT:
-    if (!turnActive || activeTurnState != TURN_LEFT) {
-      turnStartTime = millis();
-      turnActive = true;
-      activeTurnState = TURN_LEFT;
-    }
-    if (millis() - turnStartTime < TURN_LEFT_DURATION) {
-      setDrive(-TURN_SPEED, TURN_SPEED);
-    } else {
-      setDrive(0.0, 0.0);
-      turnActive = false;
-      currentState = FOLLOW;
-      lastPath = LEFT;
-    }
-    break;
+    case TURN_LEFT:
+      if (!turnActive || activeTurnState != TURN_LEFT) {
+        turnStartTime = millis();
+        turnActive = true;
+        activeTurnState = TURN_LEFT;
+      }
+      if (millis() - turnStartTime < TURN_LEFT_DURATION) {
+        setDrive(-TURN_SPEED, TURN_SPEED);
+      } else {
+        setDrive(0.0, 0.0);
+        turnActive = false;
+        currentState = FOLLOW;
+        lastPath = LEFT;
+      }
+      break;
 
   case TURN_RIGHT:
     if (!turnActive || activeTurnState != TURN_RIGHT) {

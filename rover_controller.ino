@@ -13,7 +13,7 @@
 MotoronI2C mc1(0x10); // on top
 MotoronI2C mc2(0x0B); // at the bottom (since I removed the top to change its address)
 
-#define BUTTON_PIN 50
+#define BUTTON_PIN 52
 #define DEBOUNCE_TIME 25
 int last_steady_state = LOW;       // the previous steady state from the input pin
 int last_flickerable_state = LOW;  // the previous flickerable state from the input pin
@@ -24,10 +24,12 @@ unsigned long last_debounce_time = 0;  // the last time the output pin was toggl
 Average<float> ave_ldr(100);
 DistanceSensor sensor(A0);
 
-const uint8_t SENSOR_PINS[9] = {24, 25, 26, 27, 28, 29, 30, 31, 32};
-const uint8_t LED_PIN = 22;
-QTRSensorArray qtrL(SENSOR_PINS, LED_PIN);
-QTRSensorArray qtrR(SENSOR_PINS, LED_PIN);
+const uint8_t SENSOR_PINS_L[9] = {24, 25, 26, 27, 28, 29, 30, 31, 32};
+const uint8_t LED_PIN_L = 22;
+QTRSensorArray qtrL(SENSOR_PINS_L, LED_PIN_L);
+const uint8_t SENSOR_PINS_R[9] = {40, 41, 42, 43, 44, 45, 46, 47, 48};
+const uint8_t LED_PIN_R = 38;
+QTRSensorArray qtrR(SENSOR_PINS_R, LED_PIN_R);
 uint16_t whiteAvg[9];
 uint16_t blackAvg[9];
 
@@ -42,7 +44,7 @@ float turnBias = 0.0;
 
 const float LINE_SPEED = 400.0;
 const float TURN_ADJUST = 200.0;
-PIDController pid_line(0.1, 0.01, 0.01);
+PIDController pid_line(0.1, 0.0, 0.0);
 const float TURN_SPEED = 400.0;
 
 // Global variables
@@ -124,20 +126,14 @@ void setDrive(float left_speed, float right_speed) {
 }
 
 void applyDrive(float baseSpeed, float pidBias, float turnBias) {
-  float left_speed = baseSpeed + turnBias;
-  float right_speed = baseSpeed - turnBias;
-  if (pidBias > 0.0) {
-    left_speed += pidBias;
-  }
-  else {
-    right_speed -= pidBias;
-  }
+  float left_speed = baseSpeed + pidBias + turnBias;
+  float right_speed = baseSpeed - pidBias - turnBias;
   setDrive(left_speed, right_speed);
 }
 
 float calculatePos(const uint16_t* norm1, const uint16_t* norm2) {
-      float x = 1.0;
-      float y = 2.0;
+      float x = 0.4;trf
+      float y = 0.75;
 
       float S_m = 0.0;
       float S_n = 0.0;
@@ -223,59 +219,59 @@ void loop() {
       // }
       break;
 
-    case TURN_LEFT:
-      if (!turnActive || activeTurnState != TURN_LEFT) {
-        turnStartTime = millis();
-        turnActive = true;
-        activeTurnState = TURN_LEFT;
-      }
-      if (millis() - turnStartTime < TURN_LEFT_DURATION) {
-        setDrive(-TURN_SPEED, TURN_SPEED);
-      } else {
-        setDrive(0.0, 0.0);
-        turnActive = false;
-        currentState = FOLLOW;
-        lastPath = LEFT;
-      }
-      break;
+  //   case TURN_LEFT:
+  //     if (!turnActive || activeTurnState != TURN_LEFT) {
+  //       turnStartTime = millis();
+  //       turnActive = true;
+  //       activeTurnState = TURN_LEFT;
+  //     }
+  //     if (millis() - turnStartTime < TURN_LEFT_DURATION) {
+  //       setDrive(-TURN_SPEED, TURN_SPEED);
+  //     } else {
+  //       setDrive(0.0, 0.0);
+  //       turnActive = false;
+  //       currentState = FOLLOW;
+  //       lastPath = LEFT;
+  //     }
+  //     break;
 
-  case TURN_RIGHT:
-    if (!turnActive || activeTurnState != TURN_RIGHT) {
-      turnStartTime = millis();
-      turnActive = true;
-      activeTurnState = TURN_RIGHT;
-    }
-    if (millis() - turnStartTime < TURN_RIGHT_DURATION) {
-      setDrive(TURN_SPEED, -TURN_SPEED);
-    } else {
-      setDrive(0.0, 0.0);
-      turnActive = false;
-      currentState = FOLLOW;
-      lastPath = RIGHT;
-    }
-    break;
+  // case TURN_RIGHT:
+  //   if (!turnActive || activeTurnState != TURN_RIGHT) {
+  //     turnStartTime = millis();
+  //     turnActive = true;
+  //     activeTurnState = TURN_RIGHT;
+  //   }
+  //   if (millis() - turnStartTime < TURN_RIGHT_DURATION) {
+  //     setDrive(TURN_SPEED, -TURN_SPEED);
+  //   } else {
+  //     setDrive(0.0, 0.0);
+  //     turnActive = false;
+  //     currentState = FOLLOW;
+  //     lastPath = RIGHT;
+  //   }
+  //   break;
 
-  case TURN_AROUND:
-    if (!turnActive || activeTurnState != TURN_AROUND) {
-      turnStartTime = millis();
-      turnActive = true;
-      activeTurnState = TURN_AROUND;
-    }
-    if (millis() - turnStartTime < TURN_AROUND_DURATION) {
-      setDrive(TURN_SPEED, -TURN_SPEED);
-    } else {
-      setDrive(0.0, 0.0);
-      turnActive = false;
-      currentState = FOLLOW;
-    }
-    break;
+  // case TURN_AROUND:
+  //   if (!turnActive || activeTurnState != TURN_AROUND) {
+  //     turnStartTime = millis();
+  //     turnActive = true;
+  //     activeTurnState = TURN_AROUND;
+  //   }
+  //   if (millis() - turnStartTime < TURN_AROUND_DURATION) {
+  //     setDrive(TURN_SPEED, -TURN_SPEED);
+  //   } else {
+  //     setDrive(0.0, 0.0);
+  //     turnActive = false;
+  //     currentState = FOLLOW;
+  //   }
+  //   break;
 
-    case END:
-      robot_enabled = false;
-      break;
-  }
+  //   case END:
+  //     robot_enabled = false;
+  //     break;
+  // }
 
-  const unsigned long interval = 100;
+  const unsigned long interval = 300;
   static unsigned long lastCheck = 0;
   unsigned long now = millis();
   if (now - lastCheck > interval) {

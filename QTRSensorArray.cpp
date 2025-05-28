@@ -98,8 +98,8 @@ void QTRSensorArray::calibrate()
     // }
 
     for (uint8_t i = 0; i < NUM_SENSORS; i++) {
-        sensorMin[i] = 20;
-        sensorMax[i] = 1400;
+        sensorMin[i] = 50;
+        sensorMax[i] = 700;
     }
 }
 

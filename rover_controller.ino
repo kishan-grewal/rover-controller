@@ -6,7 +6,7 @@
 #include <math.h>
 #include <WiFi.h>
 #include <WiFiUdp.h>
-#include <pid_controller.h>
+#include "pid_controller.h"
 
 #include <Wire.h>
 #include <Motoron.h>
@@ -24,11 +24,11 @@ unsigned long last_debounce_time = 0;  // the last time the output pin was toggl
 Average<float> ave_ldr(100);
 DistanceSensor sensor(A0);
 
-const uint8_t SENSOR_PINS_L[9] = {24, 25, 26, 27, 28, 29, 30, 31, 32};
-const uint8_t LED_PIN_L = 22;
+const uint8_t SENSOR_PINS_L[9] = {40, 41, 42, 43, 44, 45, 46, 47, 48};
+const uint8_t LED_PIN_L = 38;
 QTRSensorArray qtrL(SENSOR_PINS_L, LED_PIN_L);
-const uint8_t SENSOR_PINS_R[9] = {40, 41, 42, 43, 44, 45, 46, 47, 48};
-const uint8_t LED_PIN_R = 38;
+const uint8_t SENSOR_PINS_R[9] = {24, 25, 26, 27, 28, 29, 30, 31, 32};
+const uint8_t LED_PIN_R = 22;
 QTRSensorArray qtrR(SENSOR_PINS_R, LED_PIN_R);
 uint16_t whiteAvg[9];
 uint16_t blackAvg[9];
@@ -42,7 +42,7 @@ Direction lastPath = NONE; // Start with NONE
 State currentState = FOLLOW;
 float turnBias = 0.0;
 
-const float LINE_SPEED = 400.0;
+const float LINE_SPEED = 100.0;
 const float TURN_ADJUST = 200.0;
 PIDController pid_line(0.1, 0.0, 0.0);
 const float TURN_SPEED = 400.0;
@@ -56,6 +56,9 @@ State activeTurnState = FOLLOW;
 const unsigned long TURN_LEFT_DURATION = 4000;   
 const unsigned long TURN_RIGHT_DURATION = 4000;   
 const unsigned long TURN_AROUND_DURATION = 8000; 
+
+const int16_t sMAX = 800;
+const int16_t sMIN = 400;
 
 
 void setup() {
@@ -118,11 +121,39 @@ void setup() {
 void setDrive(float left_speed, float right_speed) {
   int16_t left = (int16_t)round(left_speed);
   int16_t right = (int16_t)round(right_speed);
-  left = constrain(left, -800, 800);
-  right = constrain(right, -800, 800);
-  // Set speeds, remembering motor 3 runs opposite
-  mc1.setSpeed(2, left);
-  mc1.setSpeed(3, -right);
+  
+  // Print left and right every 500ms
+  const unsigned long PRINT_INTERVAL = 500; // 500 ms
+  static unsigned long lastPrintTime = 0;
+  unsigned long currentTime = millis();
+  
+  if (currentTime - lastPrintTime >= PRINT_INTERVAL) {
+    lastPrintTime = currentTime;
+    Serial.print("left: ");
+    Serial.print(left);
+    Serial.print("  right: ");
+    Serial.println(right);
+  }
+  
+  if (left > 0) {
+    left = constrain(left, sMIN, sMAX);
+  } else if (left == 0) {
+    left = 0;
+  } else {
+    left = constrain(left, -sMAX, -sMIN);
+  }
+
+  if (right > 0) {
+    right = constrain(right, sMIN, sMAX);
+  } else if (right == 0) {
+    right = 0;
+  } else {
+    right = constrain(right, -sMAX, -sMIN);
+  }
+  
+  // Set speeds, remembering motor 2 runs opposite
+  mc1.setSpeed(2, -left);
+  mc1.setSpeed(3, right);
 }
 
 void applyDrive(float baseSpeed, float pidBias, float turnBias) {
@@ -132,7 +163,7 @@ void applyDrive(float baseSpeed, float pidBias, float turnBias) {
 }
 
 float calculatePos(const uint16_t* norm1, const uint16_t* norm2) {
-      float x = 0.4;trf
+      float x = 0.4;
       float y = 0.75;
 
       float S_m = 0.0;
@@ -157,6 +188,14 @@ float calculatePos(const uint16_t* norm1, const uint16_t* norm2) {
     return pos_result;
 }
 
+void reverseArray(uint16_t* arr, size_t size) {
+  for (size_t i = 0; i < size / 2; i++) {
+    uint16_t temp = arr[i];
+    arr[i] = arr[size - 1 - i];
+    arr[size - 1 - i] = temp;
+  }
+}
+
 float filtered_ldr = 0.0;
 
 void loop() {
@@ -177,10 +216,16 @@ void loop() {
 
   qtrL.updateSensors();
   const uint16_t* rawL = qtrL.getRaw();
-  const uint16_t* normL = qtrL.getNormalised();
+  const uint16_t* backnormL = qtrL.getNormalised();
   qtrR.updateSensors();
   const uint16_t* rawR = qtrR.getRaw();
-  const uint16_t* normR = qtrR.getNormalised();
+  const uint16_t* backnormR = qtrR.getNormalised();
+  uint16_t normL[9];
+  memcpy(normL, backnormL, 9 * sizeof(uint16_t)); // Copy into mutable buffer
+  reverseArray(normL, 9); // Reverse in place
+  uint16_t normR[9];
+  memcpy(normR, backnormR, 9 * sizeof(uint16_t)); // Copy into mutable buffer
+  reverseArray(normR, 9); // Reverse in place
 
   switch (currentState)
   {
@@ -269,25 +314,25 @@ void loop() {
   //   case END:
   //     robot_enabled = false;
   //     break;
-  // }
+  }
 
-  const unsigned long interval = 300;
+  const unsigned long interval = 800;
   static unsigned long lastCheck = 0;
   unsigned long now = millis();
   if (now - lastCheck > interval) {
       lastCheck = now;
-      // for (uint8_t i = 0; i < 9; i++) {
-      //     Serial.print(normL[i] > 200.0);
-      //     Serial.print(",");
-      // }
-      // for (uint8_t i = 0; i < 9; i++) {
-      //     Serial.print(normR[i] > 200.0);
-      //     Serial.print(",");
-      // }
-      // Serial.println();
+      for (uint8_t i = 0; i < 9; i++) {
+          Serial.print(normL[i] > 200.0);
+          Serial.print(",");
+      }
+      for (uint8_t i = 0; i < 9; i++) {
+          Serial.print(normR[i] > 200.0);
+          Serial.print(",");
+      }
+      Serial.println();
 
       float pos = calculatePos(normL, normR);
-      Serial.print(pos);
+      Serial.println(pos);
   }
 
   if (robot_enabled == false) {
@@ -316,3 +361,4 @@ void loop() {
     }
   }
 }
+

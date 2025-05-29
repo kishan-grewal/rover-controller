@@ -118,7 +118,7 @@ void setup() {
   }
 }
 
-void setDrive(float left_speed, float right_speed) {
+void setDrive(float left_speed, float right_speed, float pos) {
   int16_t left = (int16_t)round(left_speed);
   int16_t right = (int16_t)round(right_speed);
   
@@ -156,10 +156,10 @@ void setDrive(float left_speed, float right_speed) {
   mc1.setSpeed(3, right);
 }
 
-void applyDrive(float baseSpeed, float pidBias, float turnBias) {
+void applyDrive(float baseSpeed, float pidBias, float turnBias, float pos) {
   float left_speed = baseSpeed + pidBias + turnBias;
   float right_speed = baseSpeed - pidBias - turnBias;
-  setDrive(left_speed, right_speed);
+  setDrive(left_speed, right_speed, pos);
 }
 
 float calculatePos(const uint16_t* norm1, const uint16_t* norm2) {
@@ -242,7 +242,7 @@ void loop() {
 
           float pos = calculatePos(normL, normR);
           float pidBias = pid_line.compute(pos);
-          applyDrive(LINE_SPEED, pidBias, turnBias);
+          applyDrive(LINE_SPEED, pidBias, turnBias, pos);
       }
 
       // if (detectFinish()) {

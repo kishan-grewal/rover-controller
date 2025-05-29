@@ -304,18 +304,6 @@ void loop() {
     unsigned long now = millis();
     if (now - lastCheck > interval) {
         lastCheck = now;
-        for (uint8_t i = 0; i < 9; i++) {
-            Serial.print(normL[i] > 200.0);
-            Serial.print(",");
-        }
-        for (uint8_t i = 0; i < 9; i++) {
-            Serial.print(normR[i] > 200.0);
-            Serial.print(",");
-        }
-        Serial.println();
-
-        float pos_debug = calculatePos(normL, normR);
-        Serial.println(pos_debug);
     }
   }
 

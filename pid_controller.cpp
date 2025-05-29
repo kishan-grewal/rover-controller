@@ -24,5 +24,5 @@ void PIDController::reset() {
   _integral = 0;
   _prevError = 0;
   _lastTime = millis();
-  _lastDt = 0.01;
+  _lastDt = 0.001;
 }

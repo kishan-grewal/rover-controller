@@ -18,8 +18,6 @@ public:
     void printCalibration();  // Optional debug output
     bool isLineDetected(float confidence);
 
-    void runAveragingPhase(uint16_t* outputArray);
-
 private:
     uint16_t readRC(uint8_t pin);
     void readSensors(uint16_t *dest);

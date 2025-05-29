@@ -129,26 +129,3 @@ void QTRSensorArray::printCalibration()
     }
     Serial.println();
 }
-
-void QTRSensorArray::runAveragingPhase(uint16_t* outputArray)
-{
-    uint32_t sum[NUM_SENSORS] = {0};
-    uint16_t readings = 0;
-
-    unsigned long start = millis();
-    while (millis() - start < 5000) {
-        updateSensors();
-        const uint16_t* norm = getNormalised();
-
-        for (uint8_t i = 0; i < NUM_SENSORS; i++) {
-            sum[i] += norm[i];
-        }
-
-        readings++;
-        delay(10); // 100 Hz sampling
-    }
-
-    for (uint8_t i = 0; i < NUM_SENSORS; i++) {
-        outputArray[i] = sum[i] / readings;
-    }
-}

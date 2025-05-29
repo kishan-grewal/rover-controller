@@ -3,6 +3,9 @@
 SharpDistSensor
 Average
 Math
+WiFi
+WiFiUDP
+Wire
 
 ## Information
 

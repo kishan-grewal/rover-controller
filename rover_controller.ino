@@ -36,30 +36,60 @@ uint16_t blackAvg[9];
 float pid_values[3] = {0.0, 0.0, 0.0};  // kp, ki, kd
 bool pid_updated = false;              // set true when new values are received
 
-enum State { FOLLOW, TURN_LEFT, TURN_RIGHT, TURN_AROUND, END };
-enum Direction { NONE, LEFT, RIGHT };
-Direction lastPath = NONE; // Start with NONE
-State currentState = FOLLOW;
-float turnBias = 0.0;
+// Motor speed constants from doubleqtr
+const int16_t MOTOR_SPEED_MIN = 200;
+const int16_t MOTOR_SPEED_MAX = 800;
 
-const float LINE_SPEED = 100.0;
-const float TURN_ADJUST = 200.0;
-PIDController pid_line(0.1, 0.0, 0.0);
-const float TURN_SPEED = 400.0;
+// PID Controller with doubleqtr parameters
+PIDController pid(1.10, 0.10, 0.05);
+float last_pos = 0.0;
 
-// Global variables
-unsigned long turnStartTime = 0;
-bool turnActive = false;
-State activeTurnState = FOLLOW;
+// Turn detection from doubleqtr
+Average<uint16_t> ave_R(10);
+bool turning = false;
 
-// Define durations for each turn (in milliseconds)
-const unsigned long TURN_LEFT_DURATION = 4000;   
-const unsigned long TURN_RIGHT_DURATION = 4000;   
-const unsigned long TURN_AROUND_DURATION = 8000; 
+// Helper functions from doubleqtr
+uint16_t sum(bool* arr, size_t size) {
+    uint16_t count = 0;
+    for (size_t i = 0; i < size; i++) {
+        if (arr[i]) count++;
+    }
+    return count;
+}
 
-const int16_t sMAX = 800;
-const int16_t sMIN = 400;
+void reverseArray(uint16_t* arr, size_t size) {
+  for (size_t i = 0; i < size / 2; i++) {
+    uint16_t temp = arr[i];
+    arr[i] = arr[size - 1 - i];
+    arr[size - 1 - i] = temp;
+  }
+}
 
+float calculatePos(const uint16_t* norm1, const uint16_t* norm2) {
+  float x = 0.4, y = 0.75;
+  float S_m = 0.0, S_n = 0.0, weighted_sum = 0.0, M = 0.0;
+  for (int i = 0; i < 9; i++) {
+    S_m += norm1[i];
+    weighted_sum += norm1[i] * (-(y/2.0) - (8-i)*x);
+  }
+  for (int i = 0; i < 9; i++) {
+    S_n += norm2[i];
+    weighted_sum += norm2[i] * ((y/2.0) + i*x);
+  }
+  M = S_m + S_n;
+  return 1000 * (weighted_sum / M) / x;
+}
+
+float lineAverage(const uint16_t* norm)
+{
+    // Compute average of the 9 values (each in range 0–1000)
+    uint32_t total = 0;
+    for (uint8_t i = 0; i < 9; i++) {
+        total += norm[i];
+    }
+    float average = total / (1000.0f * 9); // Normalised to 0–1
+    return average;
+}
 
 void setup() {
   Serial.begin(115200);
@@ -74,10 +104,11 @@ void setup() {
     mc1.reinitialize();
     mc1.disableCrc();
     mc1.clearResetFlag();
-    mc1.setMaxAcceleration(3, 280);
-    mc1.setMaxDeceleration(3, 600);
-    mc1.setMaxAcceleration(2, 280);
-    mc1.setMaxDeceleration(2, 600);
+    // Use doubleqtr acceleration values
+    mc1.setMaxAcceleration(3, 1000);
+    mc1.setMaxDeceleration(3, 1000);
+    mc1.setMaxAcceleration(2, 1000);
+    mc1.setMaxDeceleration(2, 1000);
 
     Serial.println("Initializing controller 2 on Wire (I2C0)...");
     mc2.setBus(&Wire);       // point Motoron at Wire
@@ -85,10 +116,11 @@ void setup() {
     mc2.reinitialize();
     mc2.disableCrc();
     mc2.clearResetFlag();
-    mc2.setMaxAcceleration(3, 280);
-    mc2.setMaxDeceleration(3, 600);
-    mc2.setMaxAcceleration(2, 280);
-    mc2.setMaxDeceleration(2, 600);
+    // Use doubleqtr acceleration values
+    mc2.setMaxAcceleration(3, 1000);
+    mc2.setMaxDeceleration(3, 1000);
+    mc2.setMaxAcceleration(2, 1000);
+    mc2.setMaxDeceleration(2, 1000);
 
     Serial.println("Initialization complete");
   }
@@ -116,231 +148,185 @@ void setup() {
     last_flickerable_state = initState;
     last_debounce_time = millis();
   }
+
+  delay(5000);
 }
 
-void setDrive(float left_speed, float right_speed, float pos) {
+void setDrive(float left_speed, float right_speed) {
+  // Constrain final motor speeds to MOTOR_SPEED_MIN/MAX
+  left_speed = constrain(left_speed, MOTOR_SPEED_MIN, MOTOR_SPEED_MAX);
+  right_speed = constrain(right_speed, MOTOR_SPEED_MIN, MOTOR_SPEED_MAX);
+
   int16_t left = (int16_t)round(left_speed);
   int16_t right = (int16_t)round(right_speed);
-  
-  // Print left and right every 500ms
-  const unsigned long PRINT_INTERVAL = 500; // 500 ms
-  static unsigned long lastPrintTime = 0;
-  unsigned long currentTime = millis();
-  
-  if (currentTime - lastPrintTime >= PRINT_INTERVAL) {
-    lastPrintTime = currentTime;
-    Serial.print("left: ");
-    Serial.print(left);
-    Serial.print("  right: ");
-    Serial.println(right);
-  }
-  
-  if (left > 0) {
-    left = constrain(left, sMIN, sMAX);
-  } else if (left == 0) {
-    left = 0;
-  } else {
-    left = constrain(left, -sMAX, -sMIN);
-  }
 
-  if (right > 0) {
-    right = constrain(right, sMIN, sMAX);
-  } else if (right == 0) {
-    right = 0;
-  } else {
-    right = constrain(right, -sMAX, -sMIN);
-  }
-  
-  // Set speeds, remembering motor 2 runs opposite
   mc1.setSpeed(2, -left);
   mc1.setSpeed(3, right);
-}
-
-void applyDrive(float baseSpeed, float pidBias, float turnBias, float pos) {
-  float left_speed = baseSpeed + pidBias + turnBias;
-  float right_speed = baseSpeed - pidBias - turnBias;
-  setDrive(left_speed, right_speed, pos);
-}
-
-float calculatePos(const uint16_t* norm1, const uint16_t* norm2) {
-      float x = 0.4;
-      float y = 0.75;
-
-      float S_m = 0.0;
-      float S_n = 0.0;
-      float weighted_sum = 0.0;
-      float M = 0.0;
-    // Left side (norm1)
-    for (int i = 0; i < 9; i++) {
-        S_m += norm1[i];
-        float pos = -(y / 2.0) - (8 - i) * x;  // Position for norm1[i]
-        weighted_sum += norm1[i] * pos;
-    }
-    // Right side (norm2)
-    for (int i = 0; i < 9; i++) {
-        S_n += norm2[i];
-        float pos = (y / 2.0) + i * x;  // Position for norm2[i]
-        weighted_sum += norm2[i] * pos;
-    }
-    M = S_m + S_n;
-    float center_of_mass = weighted_sum / M;
-    float pos_result = 1000 * center_of_mass / x;
-    return pos_result;
-}
-
-void reverseArray(uint16_t* arr, size_t size) {
-  for (size_t i = 0; i < size / 2; i++) {
-    uint16_t temp = arr[i];
-    arr[i] = arr[size - 1 - i];
-    arr[size - 1 - i] = temp;
-  }
 }
 
 float filtered_ldr = 0.0;
 
 void loop() {
-  if (pid_updated == true) {
-    for (int i = 0; i < 3; i++) {
-      Serial.print(pid_values[i]);
-      Serial.print(",");
+  // --- State Tracking from doubleqtr ---
+  static unsigned long lastLoopTime = 0;  // Loop timing
+  static unsigned long lostLineStartTime = 0;  // When line loss started
+  static bool lost_line = false;  // Lost line flag (line lost too long)
+  unsigned long lostLineDuration = 0;  // Duration of line loss (updated each loop)
+
+  const unsigned long LOST_LINE_TIMEOUT = 1000;  // Timeout for lost line
+  const unsigned long LOOP_INTERVAL = 10;  // Run every 10ms (non-blocking)
+
+  unsigned long currentTime = millis();
+  if (currentTime - lastLoopTime >= LOOP_INTERVAL) {
+    lastLoopTime = currentTime;
+
+    // // PID value handling (keep existing functionality)
+    // if (pid_updated == true) {
+    //   for (int i = 0; i < 3; i++) {
+    //     Serial.print(pid_values[i]);
+    //     Serial.print(",");
+    //   }
+    //   Serial.println();
+    // }
+
+    // // Sensor updates (keep existing functionality)
+    // sensor.update();
+
+    // long ldr = analogRead(A1);
+    // float ldr_alpha = 0.1;
+    // filtered_ldr = ldr_alpha * ldr + (1 - ldr_alpha) * filtered_ldr;
+    // ave_ldr.push(filtered_ldr);
+
+    // *******************
+    // QTR sensor reading with doubleqtr logic
+    qtrL.updateSensors();
+    const uint16_t* backnormL = qtrL.getNormalised();
+    qtrR.updateSensors();
+    const uint16_t* backnormR = qtrR.getNormalised();
+
+    uint16_t normL[9], normR[9];
+    memcpy(normL, backnormL, 9 * sizeof(uint16_t));
+    memcpy(normR, backnormR, 9 * sizeof(uint16_t));
+    reverseArray(normL, 9);
+    reverseArray(normR, 9);
+
+    bool lineL[9], lineR[9];
+    uint16_t line_threshold = 200;
+    for (uint8_t i = 0; i < 9; i++) {
+      lineL[i] = (normL[i] > line_threshold);
+      lineR[i] = (normR[i] > line_threshold);
     }
-    Serial.println();
-  }
 
-  sensor.update();
+    float pos;
+    float threshold = 0.1;
+    if (qtrL.isLineDetected(threshold) || qtrR.isLineDetected(threshold)) {
+      pos = calculatePos(normL, normR);
+      last_pos = pos;  // Update last known good pos
+    } else {
+      pos = last_pos;  // Use last valid pos if line is lost
+    }
 
-  long ldr = analogRead(A1);
-  float ldr_alpha = 0.1;
-  filtered_ldr = ldr_alpha * ldr + (1 - ldr_alpha) * filtered_ldr;
-  ave_ldr.push(filtered_ldr);
+    // --- PID CONTROLLER from doubleqtr ---
+    float correction = pid.compute(pos);
+    const float baseSpeed = (MOTOR_SPEED_MIN + MOTOR_SPEED_MAX) / 2.0;  // 500
+    float left_speed = baseSpeed + correction;
+    float right_speed = baseSpeed - correction;
 
-  qtrL.updateSensors();
-  const uint16_t* rawL = qtrL.getRaw();
-  const uint16_t* backnormL = qtrL.getNormalised();
-  qtrR.updateSensors();
-  const uint16_t* rawR = qtrR.getRaw();
-  const uint16_t* backnormR = qtrR.getNormalised();
-  uint16_t normL[9];
-  memcpy(normL, backnormL, 9 * sizeof(uint16_t)); // Copy into mutable buffer
-  reverseArray(normL, 9); // Reverse in place
-  uint16_t normR[9];
-  memcpy(normR, backnormR, 9 * sizeof(uint16_t)); // Copy into mutable buffer
-  reverseArray(normR, 9); // Reverse in place
+    // Turn detection logic from doubleqtr
+    uint16_t s = sum(lineR, 9);
+    ave_R.push(s);
+    if (ave_R.mean() - s > 4.0) {
+      turning = true;
+      //Serial.println("RIGHT HAND TURN");
+      setDrive(0.0, 0.0);
+      delay(200);
+    }
 
-  switch (currentState)
-  {
-    case FOLLOW:
-      turnActive = false;
-      activeTurnState = FOLLOW;
-      
-      // Only run PID and applyDrive every 20ms
-      const unsigned long FOLLOW_PID_INTERVAL = 20;
-      static unsigned long lastFollowPIDTime = 0;
-      unsigned long currentTime = millis();
-      if (currentTime - lastFollowPIDTime >= FOLLOW_PID_INTERVAL) {
-          lastFollowPIDTime = currentTime;
-
-          float pos = calculatePos(normL, normR);
-          float pidBias = pid_line.compute(pos);
-          applyDrive(LINE_SPEED, pidBias, turnBias, pos);
+    if (turning) {
+        if (qtrR.isLineDetected(0.15) && pos < 6500.0) {
+            turning = false;  // Exit turn mode
+            pid.reset();
+            Serial.print("pos: ");
+            Serial.print(pos);
+            Serial.print(" avL: ");
+            Serial.print(lineAverage(normL));
+            Serial.print(" avR: ");
+            Serial.print(lineAverage(normR));
+            delay(200);
+        } else {
+            // Serial.println("TURNING TURNING TURNING TURNING TURNING TURNING TURNING TURNING TURNING");
+            // Serial.print("pos: ");
+            // Serial.println(pos);
+            // Serial.print(" avL: ");
+            // Serial.print(lineAverage(normL));
+            // Serial.print(" avR: ");
+            Serial.println(lineAverage(normR));
+            mc1.setSpeed(2, -800);  // Turn in place
+            mc1.setSpeed(3, -800);
+        }
+    } 
+    else 
+    {
+      if (lost_line) {
+          setDrive(0.0, 0.0);  // Stop the robot if truly lost
+          Serial.println("!! ROBOT STOPPED: LINE LOST TOO LONG !!");
+      } 
+      else {
+          // Only apply drive if robot is enabled
+          if (robot_enabled) {
+            setDrive(left_speed, right_speed);  // Normal line-following
+          } else {
+            setDrive(0.0, 0.0);
+          }
       }
 
-      // if (detectFinish()) {
-      //     currentState = END;
-      // } else if (detectJunction()) {
-      //     if (lastPath == NONE) {
-      //         lastPath = RIGHT;
-      //         turnBias = TURN_ADJUST;
-      //     } else if (lastPath == RIGHT) {
-      //         lastPath = NONE;
-      //         turnBias = 0.0;
-      //     }
-      // } else if (detectLeftTurn()) {
-      //     currentState = TURN_LEFT;
-      // } else if (detectRightTurn()) {
-      //     currentState = TURN_RIGHT;
-      // } else if (lineEnded()) {
-      //     currentState = TURN_AROUND;
-      // }
-      break;
+      // Lost line detection (only if not turning)
+      if (!(qtrL.isLineDetected(threshold) || qtrR.isLineDetected(threshold))) {
+          if (lostLineStartTime == 0) {
+              lostLineStartTime = currentTime;  // Start timing
+          }
+          lostLineDuration = currentTime - lostLineStartTime;
+          if (lostLineDuration >= LOST_LINE_TIMEOUT) {
+              lost_line = true;  // Set the lost flag
+          }
+      } 
+      else {
+          // Reset lost line tracking when line detected
+          lostLineStartTime = 0;
+          lostLineDuration = 0;
+          lost_line = false;
+      }
+    }
 
-  //   case TURN_LEFT:
-  //     if (!turnActive || activeTurnState != TURN_LEFT) {
-  //       turnStartTime = millis();
-  //       turnActive = true;
-  //       activeTurnState = TURN_LEFT;
-  //     }
-  //     if (millis() - turnStartTime < TURN_LEFT_DURATION) {
-  //       setDrive(-TURN_SPEED, TURN_SPEED);
-  //     } else {
-  //       setDrive(0.0, 0.0);
-  //       turnActive = false;
-  //       currentState = FOLLOW;
-  //       lastPath = LEFT;
-  //     }
-  //     break;
+    // Periodic sensor data output (keep existing functionality)
+    const unsigned long interval = 800;
+    static unsigned long lastCheck = 0;
+    unsigned long now = millis();
+    if (now - lastCheck > interval) {
+        lastCheck = now;
+        for (uint8_t i = 0; i < 9; i++) {
+            Serial.print(normL[i] > 200.0);
+            Serial.print(",");
+        }
+        for (uint8_t i = 0; i < 9; i++) {
+            Serial.print(normR[i] > 200.0);
+            Serial.print(",");
+        }
+        Serial.println();
 
-  // case TURN_RIGHT:
-  //   if (!turnActive || activeTurnState != TURN_RIGHT) {
-  //     turnStartTime = millis();
-  //     turnActive = true;
-  //     activeTurnState = TURN_RIGHT;
-  //   }
-  //   if (millis() - turnStartTime < TURN_RIGHT_DURATION) {
-  //     setDrive(TURN_SPEED, -TURN_SPEED);
-  //   } else {
-  //     setDrive(0.0, 0.0);
-  //     turnActive = false;
-  //     currentState = FOLLOW;
-  //     lastPath = RIGHT;
-  //   }
-  //   break;
-
-  // case TURN_AROUND:
-  //   if (!turnActive || activeTurnState != TURN_AROUND) {
-  //     turnStartTime = millis();
-  //     turnActive = true;
-  //     activeTurnState = TURN_AROUND;
-  //   }
-  //   if (millis() - turnStartTime < TURN_AROUND_DURATION) {
-  //     setDrive(TURN_SPEED, -TURN_SPEED);
-  //   } else {
-  //     setDrive(0.0, 0.0);
-  //     turnActive = false;
-  //     currentState = FOLLOW;
-  //   }
-  //   break;
-
-  //   case END:
-  //     robot_enabled = false;
-  //     break;
+        float pos_debug = calculatePos(normL, normR);
+        Serial.println(pos_debug);
+    }
   }
 
-  const unsigned long interval = 800;
-  static unsigned long lastCheck = 0;
-  unsigned long now = millis();
-  if (now - lastCheck > interval) {
-      lastCheck = now;
-      for (uint8_t i = 0; i < 9; i++) {
-          Serial.print(normL[i] > 200.0);
-          Serial.print(",");
-      }
-      for (uint8_t i = 0; i < 9; i++) {
-          Serial.print(normR[i] > 200.0);
-          Serial.print(",");
-      }
-      Serial.println();
-
-      float pos = calculatePos(normL, normR);
-      Serial.println(pos);
-  }
-
+  // Stop motors when robot is disabled
   if (robot_enabled == false) {
     setDrive(0.0, 0.0);
-    mc2.setSpeed(2, 0);
-    mc2.setSpeed(3, 0);
+    mc2.setSpeed(2, 0.0);
+    mc2.setSpeed(3, 0.0);
   }
 
+  // Button handling (keep existing functionality)
   {
     // bool stop = handleWiFi(); // UDP logic
     // if (stop == true) {
@@ -361,4 +347,3 @@ void loop() {
     }
   }
 }
-

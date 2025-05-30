@@ -1,3 +1,19 @@
+# Rover Controller - Code Usage and Customisation
+
+Contains code for controlling the rover integrating modules for line following, wall following, PID control, distance sensing, and WiFi communication The following sections describe how to use and change each part of the code
+
+## Repository Structure
+- rover_controller.ino - Main logic integrates modules
+- pid_controller.cpp / pid_controller.h - Contains PID logic
+- QTRSensorArray.cpp / QTRSensorArray.h - Reads line sensor values
+- distance_sensor.cpp / distance_sensor.h - Reads and smooths distance sensor values
+- wifi_logic.cpp / wifi_logic.h - Manages WiFi connection and UDP commands
+
+## Required Libraries
+Before uploading the code ensure the following libraries are installed in the Arduino IDE
+- WiFi, WiFiUDP (by downloading Arduino Mbed OS Giga Boards in board manager)
+- Average (by Rob Tillaart https://github.com/MajenkoLibraries/Average/tree/master/src)
+
 ## Code Use and Modification
 
 ### Source Files - Customisation Options

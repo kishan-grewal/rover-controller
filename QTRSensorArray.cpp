@@ -103,6 +103,22 @@ void QTRSensorArray::calibrate()
     }
 }
 
+void QTRSensorArray::calibrateFast()
+{
+    for (uint8_t i = 0; i < NUM_SENSORS; i++) {
+        sensorMin[i] = 50;
+        sensorMax[i] = 700;
+    }
+}
+
+void QTRSensorArray::calibrateDark()
+{
+    for (uint8_t i = 0; i < NUM_SENSORS; i++) {
+        sensorMin[i] = 25;
+        sensorMax[i] = 350;
+    }
+}
+
 bool QTRSensorArray::isLineDetected(float confidence)
 {
     // Compute average of the 9 values (each in range 0–1000)

@@ -21,17 +21,12 @@ int current_state;                 // the current reading from the input pin
 bool robot_enabled = false;
 unsigned long last_debounce_time = 0;  // the last time the output pin was toggled
 
-Average<float> ave_ldr(100);
-DistanceSensor sensor(A0);
-
 const uint8_t SENSOR_PINS_L[9] = {40, 41, 42, 43, 44, 45, 46, 47, 48};
 const uint8_t LED_PIN_L = 38;
 QTRSensorArray qtrL(SENSOR_PINS_L, LED_PIN_L);
 const uint8_t SENSOR_PINS_R[9] = {24, 25, 26, 27, 28, 29, 30, 31, 32};
 const uint8_t LED_PIN_R = 22;
 QTRSensorArray qtrR(SENSOR_PINS_R, LED_PIN_R);
-uint16_t whiteAvg[9];
-uint16_t blackAvg[9];
 
 float pid_values[3] = {0.0, 0.0, 0.0};  // kp, ki, kd
 bool pid_updated = false;              // set true when new values are received
@@ -49,6 +44,13 @@ Average<uint16_t> ave_L(10);
 Average<uint16_t> ave_R(10);
 bool turning_left = false;
 bool turning_right = false;
+
+Average<float> ave_ldr(100);
+
+Average<uint16_t> ave_posL(10);
+Average<uint16_t> ave_posR(10);
+bool junc_mode = false;
+const bool junc_right = true;  // or false if junction is always left
 
 // Helper functions from doubleqtr
 uint16_t sum(bool* arr, size_t size) {
@@ -80,6 +82,15 @@ float calculatePos(const uint16_t* norm1, const uint16_t* norm2) {
   }
   M = S_m + S_n;
   return 1000 * (weighted_sum / M) / x;
+}
+
+float halfPos(const uint16_t* norm) {
+    float sum = 0, total = 0;
+    for (int i = 0; i < 9; i++) {
+        sum += norm[i] * i;
+        total += norm[i];
+    }
+    return sum / total;
 }
 
 float lineAverage(const uint16_t* norm)
@@ -166,8 +177,6 @@ void setDrive(float left_speed, float right_speed) {
   mc1.setSpeed(3, right);
 }
 
-float filtered_ldr = 0.0;
-
 void loop() {
   // --- State Tracking from doubleqtr ---
   static unsigned long lastLoopTime = 0;  // Loop timing
@@ -191,13 +200,20 @@ void loop() {
     //   Serial.println();
     // }
 
-    // // Sensor updates (keep existing functionality)
-    // sensor.update();
-
-    // long ldr = analogRead(A1);
-    // float ldr_alpha = 0.1;
-    // filtered_ldr = ldr_alpha * ldr + (1 - ldr_alpha) * filtered_ldr;
-    // ave_ldr.push(filtered_ldr);
+    long ldr = analogRead(A1);
+    ave_ldr.push(ldr);
+    float mldr = ave_ldr.mean();
+    bool dark = (mldr > 4.0);
+    if (dark) {
+      Serial.println("DARK DARK DARK DARK DARK DARK DARK");
+      delay(10000);
+      qtrL.calibrateDark();
+      qtrR.calibrateDark();
+    }
+    else {
+      qtrL.calibrateFast();
+      qtrR.calibrateFast();
+    }
 
     // *******************
     // QTR sensor reading with doubleqtr logic
@@ -228,12 +244,6 @@ void loop() {
       pos = last_pos;  // Use last valid pos if line is lost
     }
 
-    // --- PID CONTROLLER from doubleqtr ---
-    float correction = pid.compute(pos);
-    const float baseSpeed = (MOTOR_SPEED_MIN + MOTOR_SPEED_MAX) / 2.0;  // 500
-    float left_speed = baseSpeed + correction;
-    float right_speed = baseSpeed - correction;
-
     // Turn detection logic from doubleqtr
     uint16_t sL = sum(lineL, 9);
     uint16_t sR = sum(lineR, 9);
@@ -254,10 +264,41 @@ void loop() {
       delay(200);
     }
 
-    if (turning_right) {
+    float posL = halfPos(normL);
+    float posR = halfPos(normR);
+    ave_posL.push(posL);
+    ave_posR.push(posR);
+    // Check Y-junction activation (replace with your divergence logic)
+    if ((posL - ave_posL.mean() < -2000.0) && (posR - ave_posR.mean() > 2000.0)) {
+      junc_mode = true;
+    }
+
+    // --- PID CONTROLLER ---
+    if (junc_mode) {
+      pos += junc_right ? 1000.0 : -1000.0;
+    }
+
+    // --- PID CONTROLLER from doubleqtr ---
+    float correction = pid.compute(pos);
+    const float baseSpeed = (MOTOR_SPEED_MIN + MOTOR_SPEED_MAX) / 2.0;  // 500
+    float left_speed = baseSpeed + correction;
+    float right_speed = baseSpeed - correction;
+
+    if (junc_mode) {
+      setDrive(left_speed, right_speed);
+
+      if ((junc_right && qtrR.isLineDetected(0.15)) ||
+          (!junc_right && qtrL.isLineDetected(0.15))) {
+          junc_mode = false;
+          pid.reset();
+      }
+    }
+    else if (turning_right) {
       if (qtrR.isLineDetected(0.15) && pos < 6500.0) {
         turning_right = false;
         pid.reset();
+        // delay(0);
+        // delay(100);
         delay(200);
       } else {
         mc1.setSpeed(2, -800);  // Right turn (spin)
@@ -268,6 +309,8 @@ void loop() {
         if (qtrL.isLineDetected(0.15) && pos > -6500.0) {
           turning_left = false;
           pid.reset();
+          // delay(0);
+          // delay(100);
           delay(200);
         } else {
           mc1.setSpeed(2, 800);   // Left turn (spin opposite)

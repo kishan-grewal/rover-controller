@@ -45,8 +45,10 @@ PIDController pid(1.10, 0.10, 0.05);
 float last_pos = 0.0;
 
 // Turn detection from doubleqtr
+Average<uint16_t> ave_L(10);
 Average<uint16_t> ave_R(10);
-bool turning = false;
+bool turning_left = false;
+bool turning_right = false;
 
 // Helper functions from doubleqtr
 uint16_t sum(bool* arr, size_t size) {
@@ -233,93 +235,78 @@ void loop() {
     float right_speed = baseSpeed - correction;
 
     // Turn detection logic from doubleqtr
-    uint16_t s = sum(lineR, 9);
-    ave_R.push(s);
-    if (ave_R.mean() - s > 4.0) {
-      turning = true;
+    uint16_t sL = sum(lineL, 9);
+    uint16_t sR = sum(lineR, 9);
+    ave_L.push(sL);
+    ave_R.push(sR);
+    if (ave_R.mean() - sR > 4.0) {
+      turning_right = true;
+      turning_left = false;
       //Serial.println("RIGHT HAND TURN");
       setDrive(0.0, 0.0);
       delay(200);
     }
+    else if (ave_L.mean() - sL > 4.0) {
+      turning_right = false;
+      turning_left = true;      
+      //Serial.println("LEFT HAND TURN");
+      setDrive(0.0, 0.0);
+      delay(200);
+    }
 
-    if (turning) {
-        if (qtrR.isLineDetected(0.15) && pos < 6500.0) {
-            turning = false;  // Exit turn mode
-            pid.reset();
-            Serial.print("pos: ");
-            Serial.print(pos);
-            Serial.print(" avL: ");
-            Serial.print(lineAverage(normL));
-            Serial.print(" avR: ");
-            Serial.print(lineAverage(normR));
-            delay(200);
+    if (turning_right) {
+      if (qtrR.isLineDetected(0.15) && pos < 6500.0) {
+        turning_right = false;
+        pid.reset();
+        delay(200);
+      } else {
+        mc1.setSpeed(2, -800);  // Right turn (spin)
+        mc1.setSpeed(3, -800);
+      }
+    }
+    else if (turning_left) {
+        if (qtrL.isLineDetected(0.15) && pos > -6500.0) {
+          turning_left = false;
+          pid.reset();
+          delay(200);
         } else {
-            // Serial.println("TURNING TURNING TURNING TURNING TURNING TURNING TURNING TURNING TURNING");
-            // Serial.print("pos: ");
-            // Serial.println(pos);
-            // Serial.print(" avL: ");
-            // Serial.print(lineAverage(normL));
-            // Serial.print(" avR: ");
-            Serial.println(lineAverage(normR));
-            mc1.setSpeed(2, -800);  // Turn in place
-            mc1.setSpeed(3, -800);
+          mc1.setSpeed(2, 800);   // Left turn (spin opposite)
+          mc1.setSpeed(3, 800);
         }
-    } 
+    }
     else 
     {
       if (lost_line) {
-          setDrive(0.0, 0.0);  // Stop the robot if truly lost
-          Serial.println("!! ROBOT STOPPED: LINE LOST TOO LONG !!");
+        mc1.setSpeed(2, -800);  // Right turn (spin)
+        mc1.setSpeed(3, -800);
       } 
       else {
-          // Only apply drive if robot is enabled
-          if (robot_enabled) {
-            setDrive(left_speed, right_speed);  // Normal line-following
-          } else {
-            setDrive(0.0, 0.0);
-          }
+        setDrive(left_speed, right_speed);
       }
 
       // Lost line detection (only if not turning)
-      if (!(qtrL.isLineDetected(threshold) || qtrR.isLineDetected(threshold))) {
-          if (lostLineStartTime == 0) {
-              lostLineStartTime = currentTime;  // Start timing
-          }
-          lostLineDuration = currentTime - lostLineStartTime;
-          if (lostLineDuration >= LOST_LINE_TIMEOUT) {
-              lost_line = true;  // Set the lost flag
-          }
-      } 
-      else {
+      if (lost_line && qtrR.isLineDetected(0.15) && pos < 6500.0){
           // Reset lost line tracking when line detected
           lostLineStartTime = 0;
           lostLineDuration = 0;
           lost_line = false;
       }
-    }
-
-    // Periodic sensor data output (keep existing functionality)
-    const unsigned long interval = 800;
-    static unsigned long lastCheck = 0;
-    unsigned long now = millis();
-    if (now - lastCheck > interval) {
-        lastCheck = now;
+      else if (!(qtrL.isLineDetected(threshold) || qtrR.isLineDetected(threshold))) {
+          if (lostLineStartTime == 0) {
+            lostLineStartTime = currentTime;  // Start timing
+          }
+          lostLineDuration = currentTime - lostLineStartTime;
+          if (lostLineDuration >= LOST_LINE_TIMEOUT) {
+            lost_line = true;  // Set the lost flag
+            setDrive(0.0, 0.0);
+            pid.reset();
+            delay(200);
+          }
+      } 
     }
   }
 
-  // Stop motors when robot is disabled
-  if (robot_enabled == false) {
-    setDrive(0.0, 0.0);
-    mc2.setSpeed(2, 0.0);
-    mc2.setSpeed(3, 0.0);
-  }
-
-  // Button handling (keep existing functionality)
   {
-    // bool stop = handleWiFi(); // UDP logic
-    // if (stop == true) {
-    //   robot_enabled = false;
-    // }
     current_state = digitalRead(BUTTON_PIN);
     if (current_state != last_flickerable_state) {
       last_debounce_time = millis();
@@ -332,6 +319,15 @@ void loop() {
           robot_enabled = !robot_enabled;
       }
       last_steady_state = current_state;
+    }
+    // bool stop = handleWiFi(); // UDP logic
+    // if (stop == true) {
+    //   robot_enabled = false;
+    // }
+    if (robot_enabled == false) {
+      setDrive(0.0, 0.0);
+      mc2.setSpeed(2, 0.0);
+      mc2.setSpeed(3, 0.0);
     }
   }
 }

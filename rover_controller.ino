@@ -371,6 +371,7 @@ void loop() {
       setDrive(0.0, 0.0);
       mc2.setSpeed(2, 0.0);
       mc2.setSpeed(3, 0.0);
+      pid.reset();
     }
   }
 }

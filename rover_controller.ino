@@ -7,7 +7,11 @@
 MotoronI2C mc1(0x10);
 MotoronI2C mc2(0x0B);
 
-DistanceSensor sensor(A0);
+DistanceSensor sensorLB(A6);
+DistanceSensor sensorLF(A5);
+DistanceSensor sensorC(A4);
+DistanceSensor sensorRF(A3);
+DistanceSensor sensorRB(A2);
 PIDController pid(50.0, 0.0, 0.0);
 
 const int16_t MOTOR_SPEED_MIN = 200;
@@ -15,7 +19,7 @@ const int16_t MOTOR_SPEED_MAX = 800;
 const float TARGET_DISTANCE = 8.0;
 const unsigned long LOOP_INTERVAL = 10;
 
-#define BUTTON_PIN 52
+#define BUTTON_PIN 23
 #define DEBOUNCE_TIME 25
 int last_steady_state = LOW;
 int last_flickerable_state = LOW;
@@ -74,8 +78,8 @@ void loop() {
     if (currentTime - lastLoopTime >= LOOP_INTERVAL) {
       lastLoopTime = currentTime;
 
-      sensor.update();  
-      float distance = sensor.getMean();
+      sensorLF.update();  
+      float distance = sensorLF.getMean();
       float error = TARGET_DISTANCE - distance;
       float correction = pid.compute(error);
 

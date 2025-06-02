@@ -9,7 +9,7 @@ const int16_t MOTOR_SPEED_MIN = 200;
 const int16_t MOTOR_SPEED_MAX = 800;
 const unsigned long LOOP_INTERVAL = 10;
 
-#define BUTTON_PIN 52
+#define BUTTON_PIN 23
 #define DEBOUNCE_TIME 25
 int last_steady_state = LOW;
 int last_flickerable_state = LOW;

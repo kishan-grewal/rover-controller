@@ -30,6 +30,7 @@ void setup() {
     Serial.begin(115200);
     while (!Serial);
 
+    //setupWiFi();
     pinMode(BUTTON_PIN, INPUT_PULLUP);  // Setup button pin
 
     // Initialize Motoron controllers

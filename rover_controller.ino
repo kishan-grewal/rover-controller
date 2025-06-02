@@ -88,21 +88,19 @@ void loop() {
     if (currentTime - lastLoopTime >= LOOP_INTERVAL) {
         lastLoopTime = currentTime;
 
-        if (robot_enabled) {
-            sensor.update();  
-            float distance = sensor.getMean();
-            float error = TARGET_DISTANCE - distance;
-            float correction = pid.compute(error);
+        sensor.update();  
+        float distance = sensor.getMean();
+        float error = TARGET_DISTANCE - distance;
+        float correction = pid.compute(error);
 
-            const float baseSpeed = (MOTOR_SPEED_MIN + MOTOR_SPEED_MAX) / 2.0;
-            float left_speed = baseSpeed + correction;
-            float right_speed = baseSpeed - correction;
+        const float baseSpeed = (MOTOR_SPEED_MIN + MOTOR_SPEED_MAX) / 2.0;
+        float left_speed = baseSpeed + correction;
+        float right_speed = baseSpeed - correction;
 
-            setDrive(left_speed, right_speed);
-        } else {
-            setDrive(0.0, 0.0);  // Stop motors if disabled
-            mc2.setSpeed(2, 0.0);
-            mc2.setSpeed(3, 0.0);
+        setDrive(left_speed, right_speed);
+
+        if (robot_enabled == false) {
+          setDrive(0.0, 0.0);
         }
     }
 }

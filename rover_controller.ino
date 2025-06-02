@@ -13,7 +13,7 @@
 MotoronI2C mc1(0x10); // on top
 MotoronI2C mc2(0x0B); // at the bottom (since I removed the top to change its address)
 
-#define BUTTON_PIN 52
+#define BUTTON_PIN 23
 #define DEBOUNCE_TIME 25
 int last_steady_state = LOW;       // the previous steady state from the input pin
 int last_flickerable_state = LOW;  // the previous flickerable state from the input pin
@@ -200,20 +200,20 @@ void loop() {
     //   Serial.println();
     // }
 
-    long ldr = analogRead(A1);
-    ave_ldr.push(ldr);
-    float mldr = ave_ldr.mean();
-    bool dark = (mldr > 4.0);
-    if (dark) {
-      Serial.println("DARK DARK DARK DARK DARK DARK DARK");
-      delay(10000);
-      qtrL.calibrateDark();
-      qtrR.calibrateDark();
-    }
-    else {
-      qtrL.calibrateFast();
-      qtrR.calibrateFast();
-    }
+    // long ldr = analogRead(A1);
+    // ave_ldr.push(ldr);
+    // float mldr = ave_ldr.mean();
+    // bool dark = (mldr > 4.0);
+    // if (dark) {
+    //   Serial.println("DARK DARK DARK DARK DARK DARK DARK");
+    //   delay(10000);
+    //   qtrL.calibrateDark();
+    //   qtrR.calibrateDark();
+    // }
+    // else {
+    //   qtrL.calibrateFast();
+    //   qtrR.calibrateFast();
+    // }
 
     // *******************
     // QTR sensor reading with doubleqtr logic

@@ -9,6 +9,7 @@ public:
 
     void begin();
     void calibrate();
+    void calibrate_time(unsigned long duration_ms);
     void calibrateFast();
     void calibrateDark();
 

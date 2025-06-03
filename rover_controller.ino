@@ -12,7 +12,8 @@ DistanceSensor sensorLF(A5);
 DistanceSensor sensorC(A4);
 DistanceSensor sensorRF(A3);
 DistanceSensor sensorRB(A2);
-PIDController pid(50.0, 0.0, 0.0);
+PIDController pid_distance(10.0, 0.0, 0.0);
+PIDController pid_angle(0.0, 0.0, 0.0);
 
 const int16_t MOTOR_SPEED_MIN = 200;
 const int16_t MOTOR_SPEED_MAX = 800;
@@ -78,14 +79,22 @@ void loop() {
     if (currentTime - lastLoopTime >= LOOP_INTERVAL) {
       lastLoopTime = currentTime;
 
-      sensorLF.update();  
-      float distance = sensorLF.getMean();
-      float error = TARGET_DISTANCE - distance;
-      float correction = pid.compute(error);
+      // Update both sensors
+      sensorLF.update();
+      sensorLB.update();
 
+      // Compute errors
+      float distance_error = TARGET_DISTANCE - sensorLF.getMean();
+      float angle_error = sensorLB.getMean() - sensorLF.getMean();
+
+      // Compute corrections
+      float correction_distance = pid_distance.compute(distance_error);
+      float correction_angle = pid_angle.compute(angle_error);
+
+      // Combine corrections
       const float baseSpeed = (MOTOR_SPEED_MIN + MOTOR_SPEED_MAX) / 2.0;
-      float left_speed = baseSpeed + correction;
-      float right_speed = baseSpeed - correction;
+      float left_speed = baseSpeed + correction_distance - correction_angle;
+      float right_speed = baseSpeed + correction_distance + correction_angle;
 
       setDrive(left_speed, right_speed);
 
@@ -112,7 +121,8 @@ void loop() {
         setDrive(0.0, 0.0);
         mc2.setSpeed(2, 0.0);
         mc2.setSpeed(3, 0.0);
-        pid.reset();
+        pid_distance.reset();
+        pid_angle.reset();
       }
     }
 }

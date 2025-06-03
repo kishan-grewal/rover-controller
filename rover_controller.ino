@@ -25,7 +25,7 @@ const unsigned long LOOP_INTERVAL = 10;
 int last_steady_state = LOW;
 int last_flickerable_state = LOW;
 int current_state;
-bool robot_enabled = false;
+bool robot_enabled = true;
 unsigned long last_debounce_time = 0;
 
 void setDrive(float left_speed, float right_speed) {

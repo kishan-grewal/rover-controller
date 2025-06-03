@@ -13,7 +13,7 @@ DistanceSensor sensorC(A4);
 DistanceSensor sensorRF(A3);
 DistanceSensor sensorRB(A2);
 PIDController pid_distance(10.0, 0.0, 0.0);
-PIDController pid_angle(0.0, 0.0, 0.0);
+PIDController pid_angle(5.0, 0.0, 0.0);  // Start with a small P gain
 
 const int16_t MOTOR_SPEED_MIN = 200;
 const int16_t MOTOR_SPEED_MAX = 800;
@@ -41,10 +41,8 @@ void setup() {
     Serial.begin(115200);
     while (!Serial);
 
-    //setupWiFi();
-    pinMode(BUTTON_PIN, INPUT_PULLUP);  // Setup button pin
+    pinMode(BUTTON_PIN, INPUT_PULLUP);
 
-    // Initialize Motoron controllers
     mc1.setBus(&Wire1);
     Wire1.begin();
     mc1.reinitialize();
@@ -65,7 +63,6 @@ void setup() {
     mc2.setMaxAcceleration(2, 1000);
     mc2.setMaxDeceleration(2, 1000);
 
-    // Read initial button state
     int initState = digitalRead(BUTTON_PIN);
     last_steady_state = initState;
     last_flickerable_state = initState;
@@ -77,52 +74,70 @@ void loop() {
     unsigned long currentTime = millis();
 
     if (currentTime - lastLoopTime >= LOOP_INTERVAL) {
-      lastLoopTime = currentTime;
+        lastLoopTime = currentTime;
 
-      // Update both sensors
-      sensorLF.update();
-      sensorLB.update();
+        sensorLF.update();
+        sensorLB.update();
+        sensorC.update();
 
-      // Compute errors
-      float distance_error = TARGET_DISTANCE - sensorLF.getMean();
-      float angle_error = sensorLB.getMean() - sensorLF.getMean();
+        float distance_error = TARGET_DISTANCE - sensorLF.getMean();
+        float angle_error = sensorLB.getMean() - sensorLF.getMean();
+        float center_distance = sensorC.getMean();
 
-      // Compute corrections
-      float correction_distance = pid_distance.compute(distance_error);
-      float correction_angle = pid_angle.compute(angle_error);
+        static bool corner_turning = false;
 
-      // Combine corrections
-      const float baseSpeed = (MOTOR_SPEED_MIN + MOTOR_SPEED_MAX) / 2.0;
-      float left_speed = baseSpeed + correction_distance - correction_angle;
-      float right_speed = baseSpeed + correction_distance + correction_angle;
-
-      setDrive(left_speed, right_speed);
-
-      // --- BUTTON HANDLING ---
-      current_state = digitalRead(BUTTON_PIN);
-      if (current_state != last_flickerable_state) {
-        last_debounce_time = millis();
-        last_flickerable_state = current_state;
-      }
-      if ((millis() - last_debounce_time) > DEBOUNCE_TIME) {
-        if (last_steady_state == HIGH && current_state == LOW) {
-            // Button press detected
-        } else if (last_steady_state == LOW && current_state == HIGH) {
-            robot_enabled = !robot_enabled;
+        if (center_distance < 5.0) {
+            // Corner detected, initiate turn
+            corner_turning = true;
+            setDrive(800.0, -800.0);  // Turn in place
+            Serial.println("Turning corner...");
         }
-        last_steady_state = current_state;
-      }
+        else if (corner_turning) {
+            // Corner clearing phase, check angle_error
+            if (abs(angle_error) < 2.0) {
+                // Finished turning, back to wall following
+                corner_turning = false;
+                pid_distance.reset();
+                pid_angle.reset();
+                Serial.println("Corner cleared, back to straight.");
+            } else {
+                // Still adjusting turn
+                setDrive(800.0, -800.0);
+                Serial.println("Aligning after turn...");
+            }
+        }
+        else {
+            // Normal PID wall following
+            float correction_distance = pid_distance.compute(distance_error);
+            float correction_angle = pid_angle.compute(angle_error);
+            const float baseSpeed = (MOTOR_SPEED_MIN + MOTOR_SPEED_MAX) / 2.0;
+            float left_speed = baseSpeed + correction_distance - correction_angle;
+            float right_speed = baseSpeed + correction_distance + correction_angle;
 
-      // bool stop = handleWiFi(); // UDP logic
-      // if (stop == true) {
-      //   robot_enabled = false;
-      // }
-      if (robot_enabled == false) {
-        setDrive(0.0, 0.0);
-        mc2.setSpeed(2, 0.0);
-        mc2.setSpeed(3, 0.0);
-        pid_distance.reset();
-        pid_angle.reset();
-      }
+            setDrive(left_speed, right_speed);
+        }
+
+        // --- BUTTON HANDLING ---
+        current_state = digitalRead(BUTTON_PIN);
+        if (current_state != last_flickerable_state) {
+            last_debounce_time = millis();
+            last_flickerable_state = current_state;
+        }
+        if ((millis() - last_debounce_time) > DEBOUNCE_TIME) {
+            if (last_steady_state == HIGH && current_state == LOW) {
+                // Button press detected
+            } else if (last_steady_state == LOW && current_state == HIGH) {
+                robot_enabled = !robot_enabled;
+            }
+            last_steady_state = current_state;
+        }
+
+        if (robot_enabled == false) {
+            setDrive(0.0, 0.0);
+            mc2.setSpeed(2, 0.0);
+            mc2.setSpeed(3, 0.0);
+            pid_distance.reset();
+            pid_angle.reset();
+        }
     }
 }

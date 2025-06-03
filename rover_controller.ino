@@ -200,20 +200,19 @@ void loop() {
     //   Serial.println();
     // }
 
-    // long ldr = analogRead(A1);
-    // ave_ldr.push(ldr);
-    // float mldr = ave_ldr.mean();
-    // bool dark = (mldr > 4.0);
-    // if (dark) {
-    //   Serial.println("DARK DARK DARK DARK DARK DARK DARK");
-    //   delay(10000);
-    //   qtrL.calibrateDark();
-    //   qtrR.calibrateDark();
-    // }
-    // else {
-    //   qtrL.calibrateFast();
-    //   qtrR.calibrateFast();
-    // }
+    ave_ldr.push(analogRead(A1));
+    float mldr = ave_ldr.mean();
+    bool dark = (mldr < 100.0);
+    if (dark) {
+      Serial.println("DARK DARK DARK DARK DARK DARK DARK");
+      delay(10000);
+      qtrL.calibrateDark();
+      qtrR.calibrateDark();
+    }
+    else {
+      qtrL.calibrateFast();
+      qtrR.calibrateFast();
+    }
 
     // *******************
     // QTR sensor reading with doubleqtr logic

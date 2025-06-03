@@ -12,11 +12,11 @@ DistanceSensor sensorLF(A5);
 DistanceSensor sensorC(A4);
 DistanceSensor sensorRF(A3);
 DistanceSensor sensorRB(A2);
-PIDController pid_distance(30.0, 0.0, 0.0);
+PIDController pid_distance(10.0, 0.0, 0.0);
 PIDController pid_angle(0.0, 0.0, 0.0);  // Start with a small P gain
 
-const int16_t MOTOR_SPEED_MIN = 400;
-const int16_t MOTOR_SPEED_MAX = 600;
+const int16_t MOTOR_SPEED_MIN = 300;
+const int16_t MOTOR_SPEED_MAX = 500;
 const float TARGET_DISTANCE = 8.0;
 const unsigned long LOOP_INTERVAL = 10;
 
@@ -92,14 +92,8 @@ void loop() {
 
         float distance_error = TARGET_DISTANCE - sensorLF.getMean();
         float angle_error = sensorLB.getMean() - sensorLF.getMean();
-
-        if (currentTime - lastPrintTime >= 500) {
-          // Serial.print("dist e: ");
-          // Serial.println(distance_error);
-          // Serial.print("angle e: ");
-          // Serial.print(angle_error);
-          Serial.println(sensorLF.getMean());
-          lastPrintTime = currentTime;
+        if (angle_error < 0) {
+            angle_error *= 2;
         }
 
         
@@ -132,9 +126,19 @@ void loop() {
             // Normal PID wall following
             float correction_distance = pid_distance.compute(distance_error);
             float correction_angle = pid_angle.compute(angle_error);
+
             const float baseSpeed = (MOTOR_SPEED_MIN + MOTOR_SPEED_MAX) / 2.0;
-            float left_speed = baseSpeed + correction_distance - correction_angle;
-            float right_speed = baseSpeed + correction_distance + correction_angle;
+            float left_speed = baseSpeed + correction_distance + correction_angle;
+            float right_speed = baseSpeed - correction_distance - correction_angle;
+
+            if (currentTime - lastPrintTime >= 500) {
+                Serial.print("cd ");
+                Serial.print(correction_distance);
+                Serial.print(" ca ");
+                Serial.println(correction_angle);
+                //Serial.println(sensorLF.getMean());
+                lastPrintTime = currentTime;
+            }
 
             setDrive(left_speed, right_speed);
         }

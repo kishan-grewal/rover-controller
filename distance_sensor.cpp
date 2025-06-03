@@ -35,8 +35,8 @@ float DistanceSensor::readSmoothedVoltage() {
 
 float DistanceSensor::calculateDistance(float voltage_mV) {
     //return voltage_mV;
-    //return 8280 / (voltage_mV - 180);
-    return 8225 / (voltage_mV - 185);
+    return 8280 / (voltage_mV - 180);
+    //return 8225 / (voltage_mV - 185);
     //return 7400 / (voltage_mV - 391);
     // return 4600.5 * pow(voltage_mV, -0.941) - 1.0;
 }

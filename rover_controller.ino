@@ -144,14 +144,14 @@ void setup() {
     qtrL.begin();
     delay(700);
     qtrL.calibrate_time(3000);
-    //qtrL.printCalibration();
+    qtrL.printCalibration();
 
     Serial.print("Calibrating R");
     delay(50);
     qtrR.begin();
     delay(700);
     qtrR.calibrate_time(3000);
-    //qtrR.printCalibration();
+    qtrR.printCalibration();
   }
 
   {
@@ -170,16 +170,16 @@ void setDrive(float left_speed, float right_speed) {
   left_speed = constrain(left_speed, MOTOR_SPEED_MIN, MOTOR_SPEED_MAX);
   right_speed = constrain(right_speed, MOTOR_SPEED_MIN, MOTOR_SPEED_MAX);
 
-  int16_t left = (int16_t)round(left_speed * 5 / 10.905);
-  int16_t right = (int16_t)round(right_speed * 5 / 10.905);
+  int16_t left = (int16_t)round(left_speed * 5 / 11.9);
+  int16_t right = (int16_t)round(right_speed * 5 / 11.9);
 
   mc1.setSpeed(2, -left);
   mc1.setSpeed(3, right);
 }
 
 void setDriveUnc(float left_speed, float right_speed) {
-  int16_t left = (int16_t)round(left_speed * 5 / 10.905);
-  int16_t right = (int16_t)round(right_speed * 5 / 10.905);
+  int16_t left = (int16_t)round(left_speed);
+  int16_t right = (int16_t)round(right_speed);
 
   mc1.setSpeed(2, -left);
   mc1.setSpeed(3, right);
@@ -315,7 +315,7 @@ void loop() {
         // delay(100);
         delay(200);
       } else {
-        setDriveUnc(800, -800);
+        setDriveUnc(400, -400);
       }
     }
     else if (turning_left) {
@@ -326,14 +326,14 @@ void loop() {
           // delay(100);
           delay(200);
         } else {
-          setDriveUnc(-800, 800);
+          setDriveUnc(-400, 400);
         }
     }
     else 
     {
       if (lost_line) {
         Serial.println("LOST LINE");
-        setDriveUnc(800, -800);
+        setDriveUnc(400, -400);
       } 
       else {
         setDrive(left_speed, right_speed);

@@ -269,7 +269,7 @@ void loop() {
     ave_posL.push(posL);
     ave_posR.push(posR);
     // Check Y-junction activation (replace with your divergence logic)
-    if ((posL - ave_posL.mean() < -2000.0) && (posR - ave_posR.mean() > 2000.0)) {
+    if ((posL - ave_posL.mean() < -1000.0) && (posR - ave_posR.mean() > 1000.0)) {
       junc_mode = true;
     }
 

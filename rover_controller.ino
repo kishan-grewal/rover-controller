@@ -200,14 +200,15 @@ void loop() {
     //   Serial.println();
     // }
 
-    ave_ldr.push(analogRead(A1));
+    long ldr = analogRead(A1);
+    ave_ldr.push(ldr);
     float mldr = ave_ldr.mean();
     bool dark = (mldr < 100.0);
     if (dark) {
       Serial.println("DARK DARK DARK DARK DARK DARK DARK");
-      delay(10000);
       qtrL.calibrateDark();
       qtrR.calibrateDark();
+      delay(10000);
     }
     else {
       qtrL.calibrateFast();

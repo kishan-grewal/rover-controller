@@ -12,11 +12,11 @@ DistanceSensor sensorLF(A5);
 DistanceSensor sensorC(A4);
 DistanceSensor sensorRF(A3);
 DistanceSensor sensorRB(A2);
-PIDController pid_distance(10.0, 0.0, 0.0);
-PIDController pid_angle(5.0, 0.0, 0.0);  // Start with a small P gain
+PIDController pid_distance(30.0, 0.0, 0.0);
+PIDController pid_angle(0.0, 0.0, 0.0);  // Start with a small P gain
 
-const int16_t MOTOR_SPEED_MIN = 200;
-const int16_t MOTOR_SPEED_MAX = 800;
+const int16_t MOTOR_SPEED_MIN = 400;
+const int16_t MOTOR_SPEED_MAX = 600;
 const float TARGET_DISTANCE = 8.0;
 const unsigned long LOOP_INTERVAL = 10;
 
@@ -31,8 +31,15 @@ unsigned long last_debounce_time = 0;
 void setDrive(float left_speed, float right_speed) {
   left_speed = constrain(left_speed, MOTOR_SPEED_MIN, MOTOR_SPEED_MAX);
   right_speed = constrain(right_speed, MOTOR_SPEED_MIN, MOTOR_SPEED_MAX);
-  int16_t left = (int16_t)round(left_speed);
-  int16_t right = (int16_t)round(right_speed);
+  int16_t left = (int16_t)round(left_speed * 5 / 10.905);
+  int16_t right = (int16_t)round(right_speed * 5 / 10.905);
+  mc1.setSpeed(2, -left);
+  mc1.setSpeed(3, right);
+}
+
+void setDriveUnc(float left_speed, float right_speed) {
+  int16_t left = (int16_t)round(left_speed * 5 / 10.905);
+  int16_t right = (int16_t)round(right_speed * 5 / 10.905);
   mc1.setSpeed(2, -left);
   mc1.setSpeed(3, right);
 }
@@ -67,10 +74,13 @@ void setup() {
     last_steady_state = initState;
     last_flickerable_state = initState;
     last_debounce_time = millis();
+
+    analogReadResolution(12);  // Use 12-bit resolution (0-4095)
 }
 
 void loop() {
     static unsigned long lastLoopTime = 0;
+    static unsigned long lastPrintTime = 0;  // Track last print time
     unsigned long currentTime = millis();
 
     if (currentTime - lastLoopTime >= LOOP_INTERVAL) {
@@ -78,35 +88,47 @@ void loop() {
 
         sensorLF.update();
         sensorLB.update();
-        sensorC.update();
+        //sensorC.update();
 
         float distance_error = TARGET_DISTANCE - sensorLF.getMean();
         float angle_error = sensorLB.getMean() - sensorLF.getMean();
-        float center_distance = sensorC.getMean();
 
-        static bool corner_turning = false;
+        if (currentTime - lastPrintTime >= 500) {
+          // Serial.print("dist e: ");
+          // Serial.println(distance_error);
+          // Serial.print("angle e: ");
+          // Serial.print(angle_error);
+          Serial.println(sensorLF.getMean());
+          lastPrintTime = currentTime;
+        }
 
-        if (center_distance < 5.0) {
-            // Corner detected, initiate turn
-            corner_turning = true;
-            setDrive(800.0, -800.0);  // Turn in place
-            Serial.println("Turning corner...");
-        }
-        else if (corner_turning) {
-            // Corner clearing phase, check angle_error
-            if (abs(angle_error) < 2.0) {
-                // Finished turning, back to wall following
-                corner_turning = false;
-                pid_distance.reset();
-                pid_angle.reset();
-                Serial.println("Corner cleared, back to straight.");
-            } else {
-                // Still adjusting turn
-                setDrive(800.0, -800.0);
-                Serial.println("Aligning after turn...");
-            }
-        }
-        else {
+        
+        // float center_distance = sensorC.getMean();
+        // static bool corner_turning = false;
+
+        // if (center_distance < 5.0) {
+        //     // Corner detected, initiate turn
+        //     corner_turning = true;
+        //     setDriveUnc(800.0, -800.0);  // Turn in place
+        //     Serial.println("Turning corner...");
+        // }
+        // else if (corner_turning) {
+        //     // Corner clearing phase, check angle_error
+        //     if (abs(angle_error) < 2.0) {
+        //         // Finished turning, back to wall following
+        //         corner_turning = false;
+        //         pid_distance.reset();
+        //         pid_angle.reset();
+        //         Serial.println("Corner cleared, back to straight.");
+        //     } else {
+        //         // Still adjusting turn
+        //         setDriveUnc(800.0, -800.0);
+        //         Serial.println("Aligning after turn...");
+        //     }
+        // }
+        // else 
+        
+        {
             // Normal PID wall following
             float correction_distance = pid_distance.compute(distance_error);
             float correction_angle = pid_angle.compute(angle_error);

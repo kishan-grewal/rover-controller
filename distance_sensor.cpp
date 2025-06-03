@@ -6,7 +6,7 @@ DistanceSensor::DistanceSensor(uint8_t pin, float alpha, size_t bufferSize)
 
 void DistanceSensor::update() {
     static unsigned long lastCheckTime = 0;
-    const unsigned long interval = 200; // 200 ms
+    const unsigned long interval = 10; // 200 ms
 
     unsigned long currentTime = millis();
 
@@ -30,9 +30,13 @@ float DistanceSensor::readSmoothedVoltage() {
         delayMicroseconds(200);
     }
     float avgADC = sum / float(samples);
-    return map(avgADC, 0, 1023, 0, 5000);  // simulate 5V analog ref
+    return map(avgADC, 0, 4095, 0, 5000);  // simulate 5V analog ref
 }
 
 float DistanceSensor::calculateDistance(float voltage_mV) {
-    return 4600.5 * pow(voltage_mV, -0.941) + 1.0;
+    //return voltage_mV;
+    //return 8280 / (voltage_mV - 180);
+    return 8225 / (voltage_mV - 185);
+    //return 7400 / (voltage_mV - 391);
+    // return 4600.5 * pow(voltage_mV, -0.941) - 1.0;
 }

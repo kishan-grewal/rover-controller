@@ -14,16 +14,23 @@ const unsigned long LOOP_INTERVAL = 10;
 int last_steady_state = LOW;
 int last_flickerable_state = LOW;
 int current_state;
-bool robot_enabled = false;
+bool robot_enabled = true;
 unsigned long last_debounce_time = 0;
 
 void setDrive(float left_speed, float right_speed) {
-  left_speed = constrain(left_speed, MOTOR_SPEED_MIN, MOTOR_SPEED_MAX);
-  right_speed = constrain(right_speed, MOTOR_SPEED_MIN, MOTOR_SPEED_MAX);
-  int16_t left = (int16_t)round(left_speed);
-  int16_t right = (int16_t)round(right_speed);
-  mc1.setSpeed(2, -left);
-  mc1.setSpeed(3, right);
+    left_speed = constrain(left_speed, MOTOR_SPEED_MIN, MOTOR_SPEED_MAX);
+    right_speed = constrain(right_speed, MOTOR_SPEED_MIN, MOTOR_SPEED_MAX);
+    int16_t left = (int16_t)round(left_speed * 5 / 10.905);
+    int16_t right = (int16_t)round(right_speed * 5 / 10.905);
+    mc1.setSpeed(2, -left);
+    mc1.setSpeed(3, right);
+}
+
+void setDriveUnc(float left_speed, float right_speed) {
+    int16_t left = (int16_t)round(left_speed * 5 / 10.905);
+    int16_t right = (int16_t)round(right_speed * 5 / 10.905);
+    mc1.setSpeed(2, -left);
+    mc1.setSpeed(3, right);
 }
 
 void setup() {

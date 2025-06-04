@@ -315,7 +315,7 @@ void loop() {
         // delay(100);
         delay(200);
       } else {
-        setDriveUnc(400, -400);
+        setDriveUnc(800, -800);
       }
     }
     else if (turning_left) {
@@ -326,14 +326,14 @@ void loop() {
           // delay(100);
           delay(200);
         } else {
-          setDriveUnc(-400, 400);
+          setDriveUnc(-800, 800);
         }
     }
     else 
     {
       if (lost_line) {
         Serial.println("LOST LINE");
-        setDriveUnc(400, -400);
+        setDriveUnc(800, -800);
       } 
       else {
         setDrive(left_speed, right_speed);

@@ -6,15 +6,34 @@ DistanceSensor::DistanceSensor(uint8_t pin, float alpha, size_t bufferSize)
 
 void DistanceSensor::update() {
     static unsigned long lastCheckTime = 0;
-    const unsigned long interval = 10; // 200 ms
-
+    const unsigned long interval = 10;
     unsigned long currentTime = millis();
 
     if (currentTime - lastCheckTime >= interval) {
         float voltage_mV = readSmoothedVoltage();
-        float distance = calculateDistance(voltage_mV);
+
+        // Check for obviously invalid voltage
+        if (isnan(voltage_mV) || isinf(voltage_mV)) {
+            ave.clear();  // Reset the average buffer
+            return;
+        }
+
+        float denominator = voltage_mV - 180;
+        if (denominator < 1e-2) {
+            ave.clear();
+            return;
+        }
+
+        float distance = 8280 / denominator;
+
+        // Validate distance before using it
+        if (isnan(distance) || isinf(distance) || distance < 1.0 || distance > 20.0) {
+            ave.clear();
+            return;
+        }
+
         filtered = alpha * distance + (1 - alpha) * filtered;
-        ave.push(filtered);
+        ave.push(filtered);  // Only push valid filtered values
     }
 }
 

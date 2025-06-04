@@ -88,7 +88,7 @@ void loop() {
 
         sensorLF.update();
         sensorLB.update();
-        //sensorC.update();
+        sensorC.update();
 
         float distance_error = TARGET_DISTANCE - sensorLF.getMean();
         float angle_error = sensorLB.getMean() - sensorLF.getMean();
@@ -131,16 +131,23 @@ void loop() {
             float left_speed = baseSpeed + correction_distance + correction_angle;
             float right_speed = baseSpeed - correction_distance - correction_angle;
 
-            if (currentTime - lastPrintTime >= 1000) {
-                Serial.print("cd ");
-                Serial.print(correction_distance);
-                Serial.print(" ca ");
-                Serial.println(correction_angle);
-                Serial.println();
+            if (currentTime - lastPrintTime >= 50) {
+                // Serial.print("cd ");
+                // Serial.print(correction_distance);
+                // Serial.print(" ca ");
+                // Serial.println(correction_angle);
+                // Serial.println();
+                
+                if (sensorC.getMean() == 0.0) {
+                  Serial.println("NO DISTANCE");
+                }
+                else {
+                  Serial.println(sensorC.getMean());
+                }
                 lastPrintTime = currentTime;
             }
 
-            setDrive(left_speed, right_speed);
+            //setDrive(left_speed, right_speed);
         }
 
         // --- BUTTON HANDLING ---

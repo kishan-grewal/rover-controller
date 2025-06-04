@@ -17,7 +17,7 @@ PIDController pid_angle(60.0, 1.0, 0.0);  // Start with a small P gain
 
 const int16_t MOTOR_SPEED_MIN = 400;
 const int16_t MOTOR_SPEED_MAX = 800;
-const float TARGET_DISTANCE = 8.0;
+const float TARGET_DISTANCE = 7.5;
 const unsigned long LOOP_INTERVAL = 10;
 
 #define BUTTON_PIN 23
@@ -97,31 +97,31 @@ void loop() {
         }
 
         
-        // float center_distance = sensorC.getMean();
-        // static bool corner_turning = false;
+        float center_distance = sensorC.getMean();
+        static bool corner_turning = false;
+        static unsigned long corner_start_time = 0;  // New: timer for corner turn
 
-        // if (center_distance < 5.0) {
-        //     // Corner detected, initiate turn
-        //     corner_turning = true;
-        //     setDriveUnc(800.0, -800.0);  // Turn in place
-        //     Serial.println("Turning corner...");
-        // }
-        // else if (corner_turning) {
-        //     // Corner clearing phase, check angle_error
-        //     if (abs(angle_error) < 2.0) {
-        //         // Finished turning, back to wall following
-        //         corner_turning = false;
-        //         pid_distance.reset();
-        //         pid_angle.reset();
-        //         Serial.println("Corner cleared, back to straight.");
-        //     } else {
-        //         // Still adjusting turn
-        //         setDriveUnc(800.0, -800.0);
-        //         Serial.println("Aligning after turn...");
-        //     }
-        // }
-        // else 
-        
+        if (center_distance < 7.5 && !corner_turning) {
+            // Corner detected, initiate turn
+            corner_turning = true;
+            corner_start_time = currentTime;  // Start timer
+            setDriveUnc(800.0, -800.0);  // Turn in place
+            Serial.println("Turning corner...");
+        }
+        else if (corner_turning) {
+            if (abs(angle_error) < 1.0 && (currentTime - corner_start_time >= 500)) {
+                // Finished turning, back to wall following
+                corner_turning = false;
+                pid_distance.reset();
+                pid_angle.reset();
+                Serial.println("Corner cleared, back to straight.");
+            } else {
+                // Still adjusting turn
+                setDriveUnc(800.0, -800.0);
+                Serial.println("Aligning after turn...");
+            }
+        }
+        else 
         {
             // Normal PID wall following
             float correction_distance = pid_distance.compute(distance_error);
@@ -137,8 +137,6 @@ void loop() {
                 Serial.print(" ca ");
                 Serial.println(correction_angle);
                 Serial.println();
-                // Serial.println(sensorLB.getMean());
-                // Serial.println(sensorLF.getMean());
                 lastPrintTime = currentTime;
             }
 

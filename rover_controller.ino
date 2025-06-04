@@ -13,16 +13,13 @@
 MotoronI2C mc1(0x10); // on top
 MotoronI2C mc2(0x0B); // at the bottom (since I removed the top to change its address)
 
-#define BUTTON_PIN 52
+#define BUTTON_PIN 23
 #define DEBOUNCE_TIME 25
 int last_steady_state = LOW;       // the previous steady state from the input pin
 int last_flickerable_state = LOW;  // the previous flickerable state from the input pin
 int current_state;                 // the current reading from the input pin
-bool robot_enabled = false;
+bool robot_enabled = true;
 unsigned long last_debounce_time = 0;  // the last time the output pin was toggled
-
-Average<float> ave_ldr(100);
-DistanceSensor sensor(A0);
 
 const uint8_t SENSOR_PINS_L[9] = {40, 41, 42, 43, 44, 45, 46, 47, 48};
 const uint8_t LED_PIN_L = 38;
@@ -30,8 +27,6 @@ QTRSensorArray qtrL(SENSOR_PINS_L, LED_PIN_L);
 const uint8_t SENSOR_PINS_R[9] = {24, 25, 26, 27, 28, 29, 30, 31, 32};
 const uint8_t LED_PIN_R = 22;
 QTRSensorArray qtrR(SENSOR_PINS_R, LED_PIN_R);
-uint16_t whiteAvg[9];
-uint16_t blackAvg[9];
 
 float pid_values[3] = {0.0, 0.0, 0.0};  // kp, ki, kd
 bool pid_updated = false;              // set true when new values are received
@@ -49,6 +44,13 @@ Average<uint16_t> ave_L(10);
 Average<uint16_t> ave_R(10);
 bool turning_left = false;
 bool turning_right = false;
+
+Average<float> ave_ldr(100);
+
+Average<uint16_t> ave_posL(10);
+Average<uint16_t> ave_posR(10);
+bool junc_mode = false;
+const bool junc_right = true;  // or false if junction is always left
 
 // Helper functions from doubleqtr
 uint16_t sum(bool* arr, size_t size) {
@@ -82,6 +84,15 @@ float calculatePos(const uint16_t* norm1, const uint16_t* norm2) {
   return 1000 * (weighted_sum / M) / x;
 }
 
+float halfPos(const uint16_t* norm) {
+    float sum = 0, total = 0;
+    for (int i = 0; i < 9; i++) {
+        sum += norm[i] * i;
+        total += norm[i];
+    }
+    return sum / total;
+}
+
 float lineAverage(const uint16_t* norm)
 {
     // Compute average of the 9 values (each in range 0–1000)
@@ -92,6 +103,12 @@ float lineAverage(const uint16_t* norm)
     float average = total / (1000.0f * 9); // Normalised to 0–1
     return average;
 }
+
+// Hook motor alternating timing
+static unsigned long hook_start_time = 0;
+static bool hook_direction = true;
+const int16_t HOOK_SPEED = -400;
+const unsigned long HOOK_INTERVAL = 3000;
 
 void setup() {
   Serial.begin(115200);
@@ -111,6 +128,8 @@ void setup() {
     mc1.setMaxDeceleration(3, 1000);
     mc1.setMaxAcceleration(2, 1000);
     mc1.setMaxDeceleration(2, 1000);
+    mc1.setMaxAcceleration(1, 1000);
+    mc1.setMaxDeceleration(1, 1000);
 
     Serial.println("Initializing controller 2 on Wire (I2C0)...");
     mc2.setBus(&Wire);       // point Motoron at Wire
@@ -127,21 +146,21 @@ void setup() {
     Serial.println("Initialization complete");
   }
 
-  {
-    Serial.print("Calibrating L");
-    delay(50);
-    qtrL.begin();
-    delay(700);
-    qtrL.calibrate();
-    qtrL.printCalibration();
+  // {
+  //   Serial.print("Calibrating L");
+  //   delay(50);
+  //   qtrL.begin();
+  //   delay(700);
+  //   qtrL.calibrate_time(3000);
+  //   qtrL.printCalibration();
 
-    Serial.print("Calibrating R");
-    delay(50);
-    qtrR.begin();
-    delay(700);
-    qtrR.calibrate();
-    qtrR.printCalibration();
-  }
+  //   Serial.print("Calibrating R");
+  //   delay(50);
+  //   qtrR.begin();
+  //   delay(700);
+  //   qtrR.calibrate_time(3000);
+  //   qtrR.printCalibration();
+  // }
 
   {
     // read the real button state once, and use that
@@ -159,6 +178,14 @@ void setDrive(float left_speed, float right_speed) {
   left_speed = constrain(left_speed, MOTOR_SPEED_MIN, MOTOR_SPEED_MAX);
   right_speed = constrain(right_speed, MOTOR_SPEED_MIN, MOTOR_SPEED_MAX);
 
+  int16_t left = (int16_t)round(left_speed * 5 / 11.9);
+  int16_t right = (int16_t)round(right_speed * 5 / 11.9);
+
+  mc1.setSpeed(2, -left);
+  mc1.setSpeed(3, right);
+}
+
+void setDriveUnc(float left_speed, float right_speed) {
   int16_t left = (int16_t)round(left_speed);
   int16_t right = (int16_t)round(right_speed);
 
@@ -166,7 +193,7 @@ void setDrive(float left_speed, float right_speed) {
   mc1.setSpeed(3, right);
 }
 
-float filtered_ldr = 0.0;
+bool line_following = false;
 
 void loop() {
   // --- State Tracking from doubleqtr ---
@@ -175,29 +202,40 @@ void loop() {
   static bool lost_line = false;  // Lost line flag (line lost too long)
   unsigned long lostLineDuration = 0;  // Duration of line loss (updated each loop)
 
-  const unsigned long LOST_LINE_TIMEOUT = 1000;  // Timeout for lost line
+  const unsigned long LOST_LINE_TIMEOUT = 3000;  // Timeout for lost line
   const unsigned long LOOP_INTERVAL = 10;  // Run every 10ms (non-blocking)
 
   unsigned long currentTime = millis();
   if (currentTime - lastLoopTime >= LOOP_INTERVAL) {
     lastLoopTime = currentTime;
 
-    // // PID value handling (keep existing functionality)
-    // if (pid_updated == true) {
-    //   for (int i = 0; i < 3; i++) {
-    //     Serial.print(pid_values[i]);
-    //     Serial.print(",");
-    //   }
-    //   Serial.println();
-    // }
+    if (!line_following) {
+      if (millis() - hook_start_time >= HOOK_INTERVAL) {
+        hook_direction = !hook_direction;
+        hook_start_time = millis();
+      }
 
-    // // Sensor updates (keep existing functionality)
-    // sensor.update();
+      int16_t speed = hook_direction ? HOOK_SPEED : -HOOK_SPEED;
+      mc1.clearMotorFaultUnconditional();
+      mc1.setSpeed(1, speed);
+      Serial.print("Hook motor running at ");
+      Serial.println(speed);
+    }
 
     // long ldr = analogRead(A1);
-    // float ldr_alpha = 0.1;
-    // filtered_ldr = ldr_alpha * ldr + (1 - ldr_alpha) * filtered_ldr;
-    // ave_ldr.push(filtered_ldr);
+    // ave_ldr.push(ldr);
+    // float mldr = ave_ldr.mean();
+    // bool dark = (mldr < 100.0);
+    // if (dark) {
+    //   Serial.println("DARK DARK DARK DARK DARK DARK DARK");
+    //   qtrL.calibrateDark();
+    //   qtrR.calibrateDark();
+    //   delay(10000);
+    // }
+    // else {
+    //   qtrL.calibrateFast();
+    //   qtrR.calibrateFast();
+    // }
 
     // *******************
     // QTR sensor reading with doubleqtr logic
@@ -211,6 +249,12 @@ void loop() {
     memcpy(normR, backnormR, 9 * sizeof(uint16_t));
     reverseArray(normL, 9);
     reverseArray(normR, 9);
+
+    if (qtrL.isLineDetected(0.40) && qtrR.isLineDetected(0.40)) {
+      setDrive(0.0, 0.0);
+      line_following = true;
+      return;
+    }
 
     bool lineL[9], lineR[9];
     uint16_t line_threshold = 200;
@@ -228,12 +272,6 @@ void loop() {
       pos = last_pos;  // Use last valid pos if line is lost
     }
 
-    // --- PID CONTROLLER from doubleqtr ---
-    float correction = pid.compute(pos);
-    const float baseSpeed = (MOTOR_SPEED_MIN + MOTOR_SPEED_MAX) / 2.0;  // 500
-    float left_speed = baseSpeed + correction;
-    float right_speed = baseSpeed - correction;
-
     // Turn detection logic from doubleqtr
     uint16_t sL = sum(lineL, 9);
     uint16_t sR = sum(lineR, 9);
@@ -242,67 +280,104 @@ void loop() {
     if (ave_R.mean() - sR > 4.0) {
       turning_right = true;
       turning_left = false;
-      //Serial.println("RIGHT HAND TURN");
+      Serial.println("RIGHT HAND TURN");
       setDrive(0.0, 0.0);
-      delay(200);
     }
     else if (ave_L.mean() - sL > 4.0) {
       turning_right = false;
       turning_left = true;      
-      //Serial.println("LEFT HAND TURN");
+      Serial.println("LEFT HAND TURN");
       setDrive(0.0, 0.0);
-      delay(200);
     }
 
+    // float posL = halfPos(normL);
+    // float posR = halfPos(normR);
+    // static unsigned long lastDiffTime = 0;  // Static to retain across loop calls
+    // if (millis() - lastDiffTime >= 100) {
+    //   ave_posL.push(posL);
+    //   ave_posR.push(posR);
+    //   // Check Y-junction activation (replace with your divergence logic)
+    //   float diffL = posL - ave_posL.mean();
+    //   float diffR = posR - ave_posR.mean();
+    //   Serial.println(diffL);
+    //   lastDiffTime = millis();
+    // }
+    //Serial.println(diffR);
+    // if ((diffL < -1000.0) && (diffR > 1000.0)) {
+    //   junc_mode = true;
+    // }
+
+    // // --- PID CONTROLLER ---
+    // if (junc_mode) {
+    //   pos += junc_right ? 1000.0 : -1000.0;
+    // }
+
+    // --- PID CONTROLLER from doubleqtr ---
+    float correction = pid.compute(pos);
+    const float baseSpeed = (MOTOR_SPEED_MIN + MOTOR_SPEED_MAX) / 2.0;  // 500
+    float left_speed = baseSpeed + correction;
+    float right_speed = baseSpeed - correction;
+
+    // if (junc_mode) {
+    //   setDrive(left_speed, right_speed);
+
+    //   if ((junc_right && qtrR.isLineDetected(0.15)) ||
+    //       (!junc_right && qtrL.isLineDetected(0.15))) {
+    //       junc_mode = false;
+    //       pid.reset();
+    //   }
+    // }
     if (turning_right) {
       if (qtrR.isLineDetected(0.15) && pos < 6500.0) {
         turning_right = false;
         pid.reset();
+        // delay(0);
+        // delay(100);
         delay(200);
       } else {
-        mc1.setSpeed(2, -800);  // Right turn (spin)
-        mc1.setSpeed(3, -800);
+        setDriveUnc(800, -800);
       }
     }
     else if (turning_left) {
         if (qtrL.isLineDetected(0.15) && pos > -6500.0) {
           turning_left = false;
           pid.reset();
+          // delay(0);
+          // delay(100);
           delay(200);
         } else {
-          mc1.setSpeed(2, 800);   // Left turn (spin opposite)
-          mc1.setSpeed(3, 800);
+          setDriveUnc(-800, 800);
         }
     }
     else 
     {
       if (lost_line) {
-        mc1.setSpeed(2, -800);  // Right turn (spin)
-        mc1.setSpeed(3, -800);
+        Serial.println("LOST LINE");
+        setDriveUnc(800, -800);
       } 
       else {
         setDrive(left_speed, right_speed);
       }
 
-      // Lost line detection (only if not turning)
-      if (lost_line && qtrR.isLineDetected(0.15) && pos < 6500.0){
-          // Reset lost line tracking when line detected
-          lostLineStartTime = 0;
-          lostLineDuration = 0;
-          lost_line = false;
-      }
-      else if (!(qtrL.isLineDetected(threshold) || qtrR.isLineDetected(threshold))) {
-          if (lostLineStartTime == 0) {
-            lostLineStartTime = currentTime;  // Start timing
-          }
-          lostLineDuration = currentTime - lostLineStartTime;
-          if (lostLineDuration >= LOST_LINE_TIMEOUT) {
-            lost_line = true;  // Set the lost flag
-            setDrive(0.0, 0.0);
-            pid.reset();
-            delay(200);
-          }
-      } 
+      // // Lost line detection (only if not turning)
+      // if (lost_line && qtrR.isLineDetected(0.15) && pos < 6500.0){
+      //     // Reset lost line tracking when line detected
+      //     lostLineStartTime = 0;
+      //     lostLineDuration = 0;
+      //     lost_line = false;
+      // }
+      // else if (!(qtrL.isLineDetected(threshold) || qtrR.isLineDetected(threshold))) {
+      //     if (lostLineStartTime == 0) {
+      //       lostLineStartTime = currentTime;  // Start timing
+      //     }
+      //     lostLineDuration = currentTime - lostLineStartTime;
+      //     if (lostLineDuration >= LOST_LINE_TIMEOUT) {
+      //       lost_line = true;  // Set the lost flag
+      //       setDrive(0.0, 0.0);
+      //       pid.reset();
+      //       delay(200);
+      //     }
+      // } 
     }
   }
 
@@ -328,6 +403,7 @@ void loop() {
       setDrive(0.0, 0.0);
       mc2.setSpeed(2, 0.0);
       mc2.setSpeed(3, 0.0);
+      pid.reset();
     }
   }
 }

@@ -27,8 +27,8 @@ void setDrive(float left_speed, float right_speed) {
 }
 
 void setDriveUnc(float left_speed, float right_speed) {
-    int16_t left = (int16_t)round(left_speed * 5 / 10.905);
-    int16_t right = (int16_t)round(right_speed * 5 / 10.905);
+    int16_t left = (int16_t)round(left_speed * 5 / 11.9);
+    int16_t right = (int16_t)round(right_speed * 5 / 11.9);
     mc1.setSpeed(2, -left);
     mc1.setSpeed(3, right);
 }

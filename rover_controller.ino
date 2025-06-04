@@ -75,7 +75,10 @@ void loop() {
     if (currentTime - lastLoopTime >= LOOP_INTERVAL) {
       lastLoopTime = currentTime;
 
-      setDrive(800.0, 800.0);
+      setDrive(0.0, 0.0);
+      mc2.setSpeed(1, 800.0);
+      mc2.setSpeed(2, 800.0);
+      mc2.setSpeed(3, 800.0);
 
       // --- BUTTON HANDLING ---
       current_state = digitalRead(BUTTON_PIN);

@@ -199,15 +199,6 @@ void loop() {
   if (currentTime - lastLoopTime >= LOOP_INTERVAL) {
     lastLoopTime = currentTime;
 
-    // // PID value handling (keep existing functionality)
-    // if (pid_updated == true) {
-    //   for (int i = 0; i < 3; i++) {
-    //     Serial.print(pid_values[i]);
-    //     Serial.print(",");
-    //   }
-    //   Serial.println();
-    // }
-
     // long ldr = analogRead(A1);
     // ave_ldr.push(ldr);
     // float mldr = ave_ldr.mean();

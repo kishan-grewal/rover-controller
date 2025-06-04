@@ -9,6 +9,9 @@ public:
 
     void begin();
     void calibrate();
+    void calibrate_time(unsigned long duration_ms);
+    void calibrateFast();
+    void calibrateDark();
 
     void updateSensors(); // Reads raw and normalised values into internal arrays
     const uint16_t* getRaw() const;         // Get pointer to latest raw values

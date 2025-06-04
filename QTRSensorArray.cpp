@@ -98,8 +98,42 @@ void QTRSensorArray::calibrate()
     // }
 
     for (uint8_t i = 0; i < NUM_SENSORS; i++) {
+        sensorMin[i] = 45;
+        sensorMax[i] = 600;
+    }
+}
+
+void QTRSensorArray::calibrate_time(unsigned long duration_ms) {
+    for (uint8_t i = 0; i < NUM_SENSORS; i++) {
+        sensorMin[i] = TIMEOUT_US;
+        sensorMax[i] = 0;
+    }
+
+    unsigned long startTime = millis();
+    while (millis() - startTime < duration_ms) {
+        uint16_t v[NUM_SENSORS];
+        readSensors(v);
+        for (uint8_t i = 0; i < NUM_SENSORS; i++) {
+            if (v[i] < sensorMin[i]) sensorMin[i] = v[i];
+            if (v[i] > sensorMax[i]) sensorMax[i] = v[i];
+        }
+        delay(5);
+    }
+}
+
+void QTRSensorArray::calibrateFast()
+{
+    for (uint8_t i = 0; i < NUM_SENSORS; i++) {
         sensorMin[i] = 50;
         sensorMax[i] = 700;
+    }
+}
+
+void QTRSensorArray::calibrateDark()
+{
+    for (uint8_t i = 0; i < NUM_SENSORS; i++) {
+        sensorMin[i] = 25;
+        sensorMax[i] = 350;
     }
 }
 

@@ -12,11 +12,11 @@ DistanceSensor sensorLF(A5);
 DistanceSensor sensorC(A4);
 DistanceSensor sensorRF(A3);
 DistanceSensor sensorRB(A2);
-PIDController pid_distance(10.0, 0.0, 0.0);
-PIDController pid_angle(0.0, 0.0, 0.0);  // Start with a small P gain
+PIDController pid_distance(40.0, 1.0, 0.0);
+PIDController pid_angle(60.0, 1.0, 0.0);  // Start with a small P gain
 
-const int16_t MOTOR_SPEED_MIN = 300;
-const int16_t MOTOR_SPEED_MAX = 500;
+const int16_t MOTOR_SPEED_MIN = 400;
+const int16_t MOTOR_SPEED_MAX = 800;
 const float TARGET_DISTANCE = 8.0;
 const unsigned long LOOP_INTERVAL = 10;
 
@@ -31,15 +31,15 @@ unsigned long last_debounce_time = 0;
 void setDrive(float left_speed, float right_speed) {
   left_speed = constrain(left_speed, MOTOR_SPEED_MIN, MOTOR_SPEED_MAX);
   right_speed = constrain(right_speed, MOTOR_SPEED_MIN, MOTOR_SPEED_MAX);
-  int16_t left = (int16_t)round(left_speed * 5 / 10.905);
-  int16_t right = (int16_t)round(right_speed * 5 / 10.905);
+  int16_t left = (int16_t)round(left_speed * 5 / 11.9);
+  int16_t right = (int16_t)round(right_speed * 5 / 11.9);
   mc1.setSpeed(2, -left);
   mc1.setSpeed(3, right);
 }
 
 void setDriveUnc(float left_speed, float right_speed) {
-  int16_t left = (int16_t)round(left_speed * 5 / 10.905);
-  int16_t right = (int16_t)round(right_speed * 5 / 10.905);
+  int16_t left = (int16_t)round(left_speed * 5 / 11.9);
+  int16_t right = (int16_t)round(right_speed * 5 / 11.9);
   mc1.setSpeed(2, -left);
   mc1.setSpeed(3, right);
 }
@@ -131,12 +131,14 @@ void loop() {
             float left_speed = baseSpeed + correction_distance + correction_angle;
             float right_speed = baseSpeed - correction_distance - correction_angle;
 
-            if (currentTime - lastPrintTime >= 500) {
+            if (currentTime - lastPrintTime >= 1000) {
                 Serial.print("cd ");
                 Serial.print(correction_distance);
                 Serial.print(" ca ");
                 Serial.println(correction_angle);
-                //Serial.println(sensorLF.getMean());
+                Serial.println();
+                // Serial.println(sensorLB.getMean());
+                // Serial.println(sensorLF.getMean());
                 lastPrintTime = currentTime;
             }
 

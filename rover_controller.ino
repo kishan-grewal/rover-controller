@@ -101,7 +101,7 @@ void loop() {
         static bool corner_turning = false;
         static unsigned long corner_start_time = 0;  // New: timer for corner turn
 
-        if (center_distance < 7.5 && !corner_turning) {
+        if (center_distance < 8.0 && !corner_turning && center_distance != 0.0 && abs(angle_error) < 1.5) {
             // Corner detected, initiate turn
             corner_turning = true;
             corner_start_time = currentTime;  // Start timer
@@ -137,7 +137,6 @@ void loop() {
                 // Serial.print(" ca ");
                 // Serial.println(correction_angle);
                 // Serial.println();
-                
                 if (sensorC.getMean() == 0.0) {
                   Serial.println("NO DISTANCE");
                 }
@@ -147,7 +146,7 @@ void loop() {
                 lastPrintTime = currentTime;
             }
 
-            //setDrive(left_speed, right_speed);
+            setDrive(left_speed, right_speed);
         }
 
         // --- BUTTON HANDLING ---

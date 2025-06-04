@@ -17,7 +17,7 @@ PIDController pid_angle(60.0, 1.0, 0.0);  // Start with a small P gain
 
 const int16_t MOTOR_SPEED_MIN = 400;
 const int16_t MOTOR_SPEED_MAX = 800;
-const float TARGET_DISTANCE = 7.5;
+const float TARGET_DISTANCE = 8.0;
 const unsigned long LOOP_INTERVAL = 10;
 
 #define BUTTON_PIN 23

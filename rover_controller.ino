@@ -104,12 +104,6 @@ float lineAverage(const uint16_t* norm)
     return average;
 }
 
-// Hook motor alternating timing
-static unsigned long hook_start_time = 0;
-static bool hook_direction = true;
-const int16_t HOOK_SPEED = -400;
-const unsigned long HOOK_INTERVAL = 3000;
-
 void setup() {
   Serial.begin(115200);
   while (!Serial);
@@ -193,7 +187,14 @@ void setDriveUnc(float left_speed, float right_speed) {
   mc1.setSpeed(3, right);
 }
 
-bool line_following = false;
+void setHook(float hook_speed) {
+  int16_t hook = (int16_t)round(hook_speed);
+
+  mc1.clearMotorFaultUnconditional();
+  mc1.setSpeed(1, hook);
+}
+
+bool hook = false;
 
 void loop() {
   // --- State Tracking from doubleqtr ---
@@ -209,17 +210,19 @@ void loop() {
   if (currentTime - lastLoopTime >= LOOP_INTERVAL) {
     lastLoopTime = currentTime;
 
-    if (!line_following) {
-      if (millis() - hook_start_time >= HOOK_INTERVAL) {
-        hook_direction = !hook_direction;
-        hook_start_time = millis();
-      }
+    if (hook) {
+      setHook(600.0);
+      Serial.println("Hook rising");
+      delay(300);
 
-      int16_t speed = hook_direction ? HOOK_SPEED : -HOOK_SPEED;
-      mc1.clearMotorFaultUnconditional();
-      mc1.setSpeed(1, speed);
-      Serial.print("Hook motor running at ");
-      Serial.println(speed);
+      setHook(0.0);
+      delay(5000);
+
+      setHook(-600.0);
+      Serial.println("Hook lowering");
+      delay(300);
+
+      setHook(0.0);
     }
 
     // long ldr = analogRead(A1);
@@ -252,7 +255,8 @@ void loop() {
 
     if (qtrL.isLineDetected(0.40) && qtrR.isLineDetected(0.40)) {
       setDrive(0.0, 0.0);
-      line_following = true;
+      hook = true;
+      Serial.println("HOOK START");
       return;
     }
 

@@ -20,6 +20,16 @@ Sensor logic like QTR and distance readings are handled in dedicated C++ classes
 
 ---
 
+## AI-Generated Content
+
+A non-zero amount of millis() timers and clocks were generated and/or fixed using ChatGPT 4o due to there being a large amount of them and them sometimes conflicting with eachother.
+
+The wifi_logic cpp has also been written with the aid of ChatGPT as the initial script had an issue of dropping out due to some delays being the wrong length of time.
+
+The oldest versions of the header files for each script e.g. pid_controller.h were also aided by AI due to an unfamiliarity with the required format which lead to syntax issues and compile errors.
+
+---
+
 ## Branch Overview
 
 - **main** -> Actively maintained branch. Supports:

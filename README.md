@@ -1,14 +1,24 @@
-# Rover Controller - Complete How-To Guide
+# Rover Controller – Complete How-To Guide
 
-This project documents a custom robot controller built for an Arduino GIGA R1 WiFi. It supports line following, wall following, and custom hook-based transitions using modular sensor logic.
-This guide includes:
+This project documents a **custom robot controller** built for the **Arduino GIGA R1 WiFi**.  
+It supports **line following**, **wall following**, and **custom hook-based transitions** using a modular sensor logic framework.
 
-- Overview of branches and which one to use
-- How the robot works out-of-the-box
-- Hardware and wiring requirements
-- Full codebase walkthrough
-- How to adapt the robot to new behaviours
-- Notes on calibration, performance, and troubleshooting
+The controller powers *Obsidian – a tracked robot built on the **Black Gladiator Tracked Chassis** from DFRobot – which successfully completed wall-following challenges in the 2025 UCL Robotics competition at UCL East, hosted by the faculty of and hosted for the first year cohort of each year of Robotics and AI students.
+
+---
+
+## Images
+
+| Front View | Side View |
+|------------|-----------|
+| ![Robot Front](tank_view.jpg) | ![Robot Side](tank_side_view.jpg) |
+
+---
+
+## Competition Video
+
+See *Obsidian* in action here:  
+[![Watch on YouTube](https://img.youtube.com/vi/KxR1-sNMbZ4/3.jpg)](https://www.youtube.com/watch?v=KxR1-sNMbZ4)
 
 ---
 
@@ -17,16 +27,6 @@ This guide includes:
 The Rover Controller project is a flexible robotics platform controlled by an Arduino GIGA R1 WiFi board. It supports multiple behaviours through modular sensor logic and configurable PID control.
 
 Sensor logic like QTR and distance readings are handled in dedicated C++ classes such as QTRSensorArray and distance_sensor, which makes modifying behaviour straightforward.
-
----
-
-## AI-Generated Content
-
-A non-zero amount of millis() timers and clocks were generated and/or fixed using ChatGPT 4o due to there being a large amount of them and them sometimes conflicting with eachother.
-
-The wifi_logic cpp has also been written with the aid of ChatGPT as the initial script had an issue of dropping out due to some delays being the wrong length of time.
-
-The oldest versions of the header files for each script e.g. pid_controller.h were also aided by AI due to an unfamiliarity with the required format which lead to syntax issues and compile errors.
 
 ---
 

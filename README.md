@@ -18,7 +18,7 @@ The controller powers *Obsidian – a tracked robot built on the **Black Gladiat
 ## Competition Video
 
 See *Obsidian* in action here:  
-[![Watch on YouTube](https://img.youtube.com/vi/KxR1-sNMbZ4/3.jpg)](https://www.youtube.com/watch?v=KxR1-sNMbZ4)
+[![Watch on YouTube](https://img.youtube.com/vi/KxR1-sNMbZ4/0.jpg)](https://www.youtube.com/watch?v=KxR1-sNMbZ4)
 
 ---
 
